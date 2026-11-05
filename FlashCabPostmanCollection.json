@@ -1,0 +1,284 @@
+{
+  "info": {
+    "_postman_id": "7cdd2e35-9e7c-4d63-9d7c-4a4f8a3f2b11",
+    "name": "FlashCab API Tests",
+    "description": "Postman Collection v2.1.0. Local Location Service (8081) and Ride Service (8083). Update sample DTO bodies to match your Java DTO definitions.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "locationBaseUrl",
+      "value": "http://localhost:8081",
+      "type": "string"
+    },
+    {
+      "key": "rideBaseUrl",
+      "value": "http://localhost:8083",
+      "type": "string"
+    },
+    {
+      "key": "driverId",
+      "value": "driver-101",
+      "type": "string"
+    },
+    {
+      "key": "riderId",
+      "value": "rider-101",
+      "type": "string"
+    },
+    {
+      "key": "rideId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "latitude",
+      "value": "12.9716",
+      "type": "string"
+    },
+    {
+      "key": "longitude",
+      "value": "77.5946",
+      "type": "string"
+    },
+    {
+      "key": "radiusInKm",
+      "value": "5",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Location Service",
+      "item": [
+        {
+          "name": "1 - Update Driver Location",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{locationBaseUrl}}/api/v1/locations/drivers/update",
+            "description": "Sample body assumes DriverLocationRequest has driverId, latitude, longitude. Adjust if your DTO differs.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"driverId\": \"{{driverId}}\",\n  \"latitude\": 12.9716,\n  \"longitude\": 77.5946\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Location update confirmation', function () { pm.expect(pm.response.text()).to.include('Driver location updated'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "2 - Find Nearby Drivers",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{locationBaseUrl}}/api/v1/locations/drivers/nearby?latitude={{latitude}}&longitude={{longitude}}&radiusInKm={{radiusInKm}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Response is an array', function () { pm.expect(pm.response.json()).to.be.an('array'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "3 - Remove Driver",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": "{{locationBaseUrl}}/api/v1/locations/drivers/{{driverId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Driver removal confirmation', function () { pm.expect(pm.response.text()).to.include('Driver Removed'); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Ride Service",
+      "item": [
+        {
+          "name": "1 - Request Ride",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{rideBaseUrl}}/api/v1/rides/request",
+            "description": "Sample body only. Confirm field names and required fields against your RideRequest DTO.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"riderId\": \"{{riderId}}\",\n  \"pickupLatitude\": 12.9716,\n  \"pickupLongitude\": 77.5946,\n  \"dropLatitude\": 12.975,\n  \"dropLongitude\": 77.599\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 201 Created', function () { pm.response.to.have.status(201); });",
+                  "pm.test('Response is JSON', function () { pm.response.to.be.json; });",
+                  "const responseBody = pm.response.json();",
+                  "const createdRideId = responseBody.rideId || responseBody.id;",
+                  "if (createdRideId !== undefined && createdRideId !== null) {",
+                  "    pm.collectionVariables.set('rideId', String(createdRideId));",
+                  "    console.log('Saved rideId:', createdRideId);",
+                  "} else {",
+                  "    console.warn('No rideId/id property found. Set the rideId collection variable manually.');",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "2 - Get Ride By ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{rideBaseUrl}}/api/v1/rides/{{rideId}}",
+            "description": "Run after Request Ride. The rideId variable is populated from ride creation if response contains rideId or id."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Response is JSON', function () { pm.response.to.be.json; });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "3 - Get Rides By Rider",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{rideBaseUrl}}/api/v1/rides/rider/{{riderId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Response is an array', function () { pm.expect(pm.response.json()).to.be.an('array'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "4 - Start Ride",
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "url": "{{rideBaseUrl}}/api/v1/rides/{{rideId}}/start",
+            "description": "Run after a ride has been created and assigned, if your service requires a driver assignment."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Response is JSON', function () { pm.response.to.be.json; });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "5 - Complete Ride",
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "url": "{{rideBaseUrl}}/api/v1/rides/{{rideId}}/complete",
+            "description": "Run after Start Ride succeeds."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Response is JSON', function () { pm.response.to.be.json; });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "6 - Cancel Ride",
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "url": "{{rideBaseUrl}}/api/v1/rides/{{rideId}}/cancel",
+            "description": "Test this with a separate newly-created ride; do not cancel the same ride after completing it."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Response is JSON', function () { pm.response.to.be.json; });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
