@@ -20,7 +20,7 @@ import java.util.Optional;
 public class MatchingService {
 
     private static final String RIDE_MATCHED_TOPIC = "ride.matched";
-    private static final double DEFAULT_SEARCH_RADIUS_KM = 5.0;
+    private static final double DEFAULT_SEARCH_RADIUS_KM = 100.0;
     private final LocationServiceClient locationServiceClient;
     private final KafkaTemplate<String, RideMatchedEvent> kafkaTemplate;
 

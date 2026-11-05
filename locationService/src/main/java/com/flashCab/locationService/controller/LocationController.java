@@ -23,6 +23,13 @@ public class LocationController {
         return ResponseEntity.ok("Driver location updated");
     }
 
+    @GetMapping("/drivers/seed")
+    public ResponseEntity<String> seedDrivers(@RequestParam int count, @RequestParam double minLatitude, @RequestParam double maxLatitude, @RequestParam double minLongitude, @RequestParam double maxLongitude) {
+
+        locationService.seedDrivers(count, minLatitude, maxLatitude, minLongitude, maxLongitude);
+        return ResponseEntity.ok(count + " drivers added to Redis");
+    }
+
     @GetMapping("/drivers/nearby")
     public ResponseEntity<List<NearByDriverResponse>> getNearByDrivers(@RequestParam double latitude, @RequestParam double longitude, @RequestParam(defaultValue = "5.0") double radiusInKm) {
         return ResponseEntity.ok(locationService.findNearByDrivers(latitude, longitude, radiusInKm));

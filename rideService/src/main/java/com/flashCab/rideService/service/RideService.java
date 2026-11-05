@@ -50,23 +50,7 @@ public class RideService {
                 savedRide.getDropAddress()
         );
 
-//        kafkaTemplate.send(RIDE_REQUESTED_TOPIC, savedRide.getId(), event);
-        try {
-            kafkaTemplate.send(RIDE_REQUESTED_TOPIC, savedRide.getId(), event)
-                    .whenComplete((result, ex) -> {
-                        if (ex != null) {
-                            log.error("Failed to publish ride.requested event", ex);
-                        } else {
-                            log.info("Successfully published ride.requested: rideId={}, partition={}, offset={}",
-                                    savedRide.getId(),
-                                    result.getRecordMetadata().partition(),
-                                    result.getRecordMetadata().offset());
-                        }
-                    });
-        } catch (Exception e) {
-            log.error("Kafka publishing failed", e);
-            throw e;
-        }
+        kafkaTemplate.send(RIDE_REQUESTED_TOPIC, savedRide.getId(), event);
         log.info("Ride requested event published to Kafka for ride: {}", savedRide.getId());
         savedRide.setStatus(RideStatus.MATCHING);
         rideRepository.save(savedRide);

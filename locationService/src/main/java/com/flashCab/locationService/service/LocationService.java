@@ -11,6 +11,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.ThreadLocalRandom;
 
 @Service
 @Slf4j
@@ -25,6 +26,25 @@ public class LocationService {
         Point driverPoint = new Point(driverLocationRequest.getLongitude(), driverLocationRequest.getLatitude());
         redisTemplate.opsForGeo().add(DRIVERS_GEO_KEY, driverPoint, driverLocationRequest.getDriverId());
         log.info("Location updated for driver: {}", driverLocationRequest.getDriverId());
+    }
+
+    public void seedDrivers(int count, double minLat, double maxLat, double minLon, double maxLon) {
+
+        ThreadLocalRandom random = ThreadLocalRandom.current();
+
+        for (int i = 1; i <= count; i++) {
+
+            String driverId = "driver:" + i;
+
+            double latitude = random.nextDouble(minLat, maxLat);
+            double longitude = random.nextDouble(minLon, maxLon);
+
+            Point point = new Point(longitude, latitude);
+
+            redisTemplate.opsForGeo().add(
+                    DRIVERS_GEO_KEY, point, driverId
+            );
+        }
     }
 
     public List<NearByDriverResponse> findNearByDrivers(double latitude, double longitude, double radiusInKm) {
@@ -60,4 +80,6 @@ public class LocationService {
         log.info("Removing driver: {}", driverId);
         redisTemplate.opsForGeo().remove(DRIVERS_GEO_KEY, driverId);
     }
+
+
 }

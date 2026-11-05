@@ -11,7 +11,7 @@ public class KafkaConfig {
 
     @Bean
     public NewTopic rideRequestedTopic() {
-        return TopicBuilder.name("Ride.requested").partitions(3).replicas(1).build();
+        return TopicBuilder.name("ride.requested").partitions(3).replicas(1).build();
     }
 
     @Bean

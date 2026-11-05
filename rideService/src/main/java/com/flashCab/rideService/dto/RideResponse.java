@@ -36,9 +36,7 @@ public class RideResponse {
     private Double actualFare;
 
     private LocalDateTime createdAt;
-
-    private LocalDateTime updatedAt;
-
+    
     private LocalDateTime startedAt;
 
     private LocalDateTime completedAt;
