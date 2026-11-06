@@ -2,13 +2,13 @@
   "info": {
     "_postman_id": "7cdd2e35-9e7c-4d63-9d7c-4a4f8a3f2b11",
     "name": "FlashCab API Tests",
-    "description": "Postman Collection v2.1.0. Local Location Service (8081), Ride Service (8083), Driver Service (8085), and Rider Service (8086).",
+    "description": "Postman Collection v2.1.0. Local Location Service (8082), Ride Service (8083), Matching Service (8084, Kafka consumer with no REST endpoints), Driver Service (8085), and Rider Service (8086).",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
     {
       "key": "locationBaseUrl",
-      "value": "http://localhost:8081",
+      "value": "http://localhost:8082",
       "type": "string"
     },
     {
@@ -38,7 +38,7 @@
     },
     {
       "key": "driverId",
-      "value": "driver-101",
+      "value": "driver:1",
       "type": "string"
     },
     {
@@ -72,7 +72,28 @@
       "name": "Location Service",
       "item": [
         {
-          "name": "1 - Update Driver Location",
+          "name": "1 - Seed Test Drivers",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{locationBaseUrl}}/api/v1/locations/drivers/seed?count=10&minLatitude=12.96&maxLatitude=12.98&minLongitude=77.58&maxLongitude=77.61",
+            "description": "Seeds 10 Redis location records named driver:1 through driver:10 near the sample pickup coordinates. Run before nearby-driver search or requesting a ride."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Seed confirmation returned', function () { pm.expect(pm.response.text()).to.include('10 drivers added to Redis'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "2 - Update Driver Location",
           "request": {
             "method": "POST",
             "header": [
@@ -82,7 +103,7 @@
               }
             ],
             "url": "{{locationBaseUrl}}/api/v1/locations/drivers/update",
-            "description": "Sample body assumes DriverLocationRequest has driverId, latitude, longitude. Adjust if your DTO differs.",
+            "description": "Updates the seeded driver:1 location to the sample pickup point.",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"driverId\": \"{{driverId}}\",\n  \"latitude\": 12.9716,\n  \"longitude\": 77.5946\n}",
@@ -107,7 +128,7 @@
           ]
       },
       {
-          "name": "2 - Find Nearby Drivers",
+          "name": "3 - Find Nearby Drivers",
           "request": {
             "method": "GET",
             "header": [],
@@ -127,7 +148,7 @@
           ]
         },
         {
-          "name": "3 - Remove Driver",
+          "name": "4 - Remove Driver",
           "request": {
             "method": "DELETE",
             "header": [],
@@ -145,6 +166,22 @@
               }
             }
           ]
+        },
+        {
+          "name": "5 - Health",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{locationBaseUrl}}/actuator/health"
+          }
+        },
+        {
+          "name": "6 - Info",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{locationBaseUrl}}/actuator/info"
+          }
         }
       ]
     },
@@ -162,10 +199,10 @@
               }
             ],
             "url": "{{rideBaseUrl}}/api/v1/rides/request",
-            "description": "Sample body only. Confirm field names and required fields against your RideRequest DTO.",
+            "description": "Uses the UUID saved by Register Rider when run first; rider-101 is a standalone fallback. Start Location Service and Matching Service with Kafka first, then seed nearby drivers before testing ride matching.",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"riderId\": \"{{riderId}}\",\n  \"pickupLatitude\": 12.9716,\n  \"pickupLongitude\": 77.5946,\n  \"dropLatitude\": 12.975,\n  \"dropLongitude\": 77.599\n}",
+              "raw": "{\n  \"riderId\": \"{{riderId}}\",\n  \"pickupLatitude\": 12.9716,\n  \"pickupLongitude\": 77.5946,\n  \"pickupAddress\": \"MG Road, Bengaluru\",\n  \"dropLatitude\": 12.975,\n  \"dropLongitude\": 77.599,\n  \"dropAddress\": \"Indiranagar, Bengaluru\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -183,6 +220,7 @@
                   "pm.test('Response is JSON', function () { pm.response.to.be.json; });",
                   "const responseBody = pm.response.json();",
                   "const createdRideId = responseBody.rideId || responseBody.id;",
+                  "pm.test('Generated ride ID is returned', function () { pm.expect(createdRideId).to.be.a('string').and.not.empty; });",
                   "if (createdRideId !== undefined && createdRideId !== null) {",
                   "    pm.collectionVariables.set('rideId', String(createdRideId));",
                   "    console.log('Saved rideId:', createdRideId);",
@@ -241,7 +279,7 @@
             "method": "PUT",
             "header": [],
             "url": "{{rideBaseUrl}}/api/v1/rides/{{rideId}}/start",
-            "description": "Run after a ride has been created and assigned, if your service requires a driver assignment."
+            "description": "Run only after matching has processed the ride and its status is ACCEPTED. The ride.requested event is handled asynchronously by Matching Service."
           },
           "event": [
             {
@@ -283,7 +321,7 @@
             "method": "PUT",
             "header": [],
             "url": "{{rideBaseUrl}}/api/v1/rides/{{rideId}}/cancel",
-            "description": "Test this with a separate newly-created ride; do not cancel the same ride after completing it."
+            "description": "For a separate cancellation test, run Request Ride again immediately before this request; rideId is updated from the new response."
           },
           "event": [
             {
@@ -297,6 +335,44 @@
               }
             }
           ]
+        },
+        {
+          "name": "7 - Health",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{rideBaseUrl}}/actuator/health"
+          }
+        },
+        {
+          "name": "8 - Info",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{rideBaseUrl}}/actuator/info"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Matching Service",
+      "description": "Matching Service has no business REST controller; ride matching is triggered by Kafka events. Only its configured Actuator endpoints are callable over HTTP.",
+      "item": [
+        {
+          "name": "1 - Health",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "http://localhost:8084/actuator/health"
+          }
+        },
+        {
+          "name": "2 - Info",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "http://localhost:8084/actuator/info"
+          }
         }
       ]
     },
@@ -440,11 +516,53 @@
                   }
                 }
               ]
-            }
-      ]
-    },
-    {
-      "name": "Rider Service",
+            },
+            {
+              "name": "6 - Health",
+                  "request": {
+                    "method": "GET",
+                    "header": [],
+                    "url": "{{driverBaseUrl}}/actuator/health",
+                    "description": "Driver Service Actuator health endpoint."
+                  },
+                  "event": [
+                    {
+                      "listen": "test",
+                      "script": {
+                        "type": "text/javascript",
+                        "exec": [
+                          "pm.test('Status is 200', function () { pm.response.to.have.status(200); });",
+                          "pm.test('Response is JSON', function () { pm.response.to.be.json; });"
+                        ]
+                      }
+                    }
+                  ]
+                },
+                {
+                  "name": "7 - Info",
+                  "request": {
+                    "method": "GET",
+                    "header": [],
+                    "url": "{{driverBaseUrl}}/actuator/info",
+                    "description": "Driver Service Actuator info endpoint."
+                  },
+                  "event": [
+                    {
+                      "listen": "test",
+                      "script": {
+                        "type": "text/javascript",
+                        "exec": [
+                          "pm.test('Status is 200', function () { pm.response.to.have.status(200); });",
+                          "pm.test('Response is JSON', function () { pm.response.to.be.json; });"
+                        ]
+                      }
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "name": "Rider Service",
       "item": [
         {
           "name": "1 - Register Rider",
@@ -483,6 +601,7 @@
                   "});",
                   "if (responseBody.id) {",
                   "    pm.collectionVariables.set('riderServiceRiderId', responseBody.id);",
+                  "    pm.collectionVariables.set('riderId', responseBody.id);",
                   "}"
                 ]
               }
@@ -584,6 +703,48 @@
                 "type": "text/javascript",
                 "exec": [
                   "pm.test('Status is 204 No Content', function () { pm.response.to.have.status(204); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "6 - Health",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{riderBaseUrl}}/actuator/health",
+            "description": "Rider Service Actuator health endpoint."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Response is JSON', function () { pm.response.to.be.json; });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "7 - Info",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{riderBaseUrl}}/actuator/info",
+            "description": "Rider Service Actuator info endpoint."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Response is JSON', function () { pm.response.to.be.json; });"
                 ]
               }
             }
