@@ -1,0 +1,1929 @@
+FLASHCAB PROJECT CODE
+Each section begins with its project-relative file path. Generated target/ files and IDE metadata are excluded.
+Credentials are replaced with environment-variable placeholders for safe sharing.
+
+========================================================================
+FILE: docker-compose.yaml
+========================================================================
+services:
+  # REDIS 
+  redis:
+    image: redis:latest
+    container_name: redis-geo
+    ports:
+      - "6379:6379"
+    networks:
+      - flashcab
+
+  # MYSQL 
+  mysql:
+    image: mysql:latest
+    container_name: mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+    networks:
+      - flashcab
+
+  # ZOOKEEPER 
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.4.0
+    container_name: zookeeper
+    ports:
+      - "2181:2181"
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    networks:
+      - flashcab
+
+  # KAFKA 
+  kafka:
+    image: confluentinc/cp-kafka:7.4.0
+    container_name: kafka
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+    networks:
+      - flashcab
+
+volumes:
+  mysql-data:
+
+networks:
+  flashcab:
+    driver: bridge
+
+========================================================================
+FILE: FlashCabPostmanCollection.json
+========================================================================
+{
+  "info": {
+    "_postman_id": "7cdd2e35-9e7c-4d63-9d7c-4a4f8a3f2b11",
+    "name": "FlashCab API Tests",
+    "description": "Postman Collection v2.1.0. Local Location Service (8081) and Ride Service (8083). Update sample DTO bodies to match your Java DTO definitions.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "locationBaseUrl",
+      "value": "http://localhost:8081",
+      "type": "string"
+    },
+    {
+      "key": "rideBaseUrl",
+      "value": "http://localhost:8083",
+      "type": "string"
+    },
+    {
+      "key": "driverId",
+      "value": "driver-101",
+      "type": "string"
+    },
+    {
+      "key": "riderId",
+      "value": "rider-101",
+      "type": "string"
+    },
+    {
+      "key": "rideId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "latitude",
+      "value": "12.9716",
+      "type": "string"
+    },
+    {
+      "key": "longitude",
+      "value": "77.5946",
+      "type": "string"
+    },
+    {
+      "key": "radiusInKm",
+      "value": "5",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Location Service",
+      "item": [
+        {
+          "name": "1 - Update Driver Location",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{locationBaseUrl}}/api/v1/locations/drivers/update",
+            "description": "Sample body assumes DriverLocationRequest has driverId, latitude, longitude. Adjust if your DTO differs.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"driverId\": \"{{driverId}}\",\n  \"latitude\": 12.9716,\n  \"longitude\": 77.5946\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Location update confirmation', function () { pm.expect(pm.response.text()).to.include('Driver location updated'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "2 - Find Nearby Drivers",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{locationBaseUrl}}/api/v1/locations/drivers/nearby?latitude={{latitude}}&longitude={{longitude}}&radiusInKm={{radiusInKm}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Response is an array', function () { pm.expect(pm.response.json()).to.be.an('array'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "3 - Remove Driver",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": "{{locationBaseUrl}}/api/v1/locations/drivers/{{driverId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Driver removal confirmation', function () { pm.expect(pm.response.text()).to.include('Driver Removed'); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Ride Service",
+      "item": [
+        {
+          "name": "1 - Request Ride",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{rideBaseUrl}}/api/v1/rides/request",
+            "description": "Sample body only. Confirm field names and required fields against your RideRequest DTO.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"riderId\": \"{{riderId}}\",\n  \"pickupLatitude\": 12.9716,\n  \"pickupLongitude\": 77.5946,\n  \"dropLatitude\": 12.975,\n  \"dropLongitude\": 77.599\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 201 Created', function () { pm.response.to.have.status(201); });",
+                  "pm.test('Response is JSON', function () { pm.response.to.be.json; });",
+                  "const responseBody = pm.response.json();",
+                  "const createdRideId = responseBody.rideId || responseBody.id;",
+                  "if (createdRideId !== undefined && createdRideId !== null) {",
+                  "    pm.collectionVariables.set('rideId', String(createdRideId));",
+                  "    console.log('Saved rideId:', createdRideId);",
+                  "} else {",
+                  "    console.warn('No rideId/id property found. Set the rideId collection variable manually.');",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "2 - Get Ride By ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{rideBaseUrl}}/api/v1/rides/{{rideId}}",
+            "description": "Run after Request Ride. The rideId variable is populated from ride creation if response contains rideId or id."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Response is JSON', function () { pm.response.to.be.json; });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "3 - Get Rides By Rider",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{rideBaseUrl}}/api/v1/rides/rider/{{riderId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Response is an array', function () { pm.expect(pm.response.json()).to.be.an('array'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "4 - Start Ride",
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "url": "{{rideBaseUrl}}/api/v1/rides/{{rideId}}/start",
+            "description": "Run after a ride has been created and assigned, if your service requires a driver assignment."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Response is JSON', function () { pm.response.to.be.json; });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "5 - Complete Ride",
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "url": "{{rideBaseUrl}}/api/v1/rides/{{rideId}}/complete",
+            "description": "Run after Start Ride succeeds."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Response is JSON', function () { pm.response.to.be.json; });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "6 - Cancel Ride",
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "url": "{{rideBaseUrl}}/api/v1/rides/{{rideId}}/cancel",
+            "description": "Test this with a separate newly-created ride; do not cancel the same ride after completing it."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Response is JSON', function () { pm.response.to.be.json; });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
+
+========================================================================
+FILE: locationService\.mvn\wrapper\maven-wrapper.properties
+========================================================================
+wrapperVersion=3.3.4
+distributionType=only-script
+distributionUrl=https://repo.maven.apache.org/maven2/org/apache/maven/apache-maven/3.10.0/apache-maven-3.10.0-bin.zip
+
+========================================================================
+FILE: locationService\pom.xml
+========================================================================
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+	<modelVersion>4.0.0</modelVersion>
+	<parent>
+		<groupId>org.springframework.boot</groupId>
+		<artifactId>spring-boot-starter-parent</artifactId>
+		<version>4.1.2</version>
+		<relativePath/> <!-- lookup parent from repository -->
+	</parent>
+	<groupId>com.flashCab</groupId>
+	<artifactId>locationService</artifactId>
+	<version>0.0.1-SNAPSHOT</version>
+	<name/>
+	<description/>
+	<url/>
+	<licenses>
+		<license/>
+	</licenses>
+	<developers>
+		<developer/>
+	</developers>
+	<scm>
+		<connection/>
+		<developerConnection/>
+		<tag/>
+		<url/>
+	</scm>
+	<properties>
+		<java.version>17</java.version>
+	</properties>
+	<dependencies>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-actuator</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-data-redis</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-webmvc</artifactId>
+		</dependency>
+
+		<dependency>
+			<groupId>org.projectlombok</groupId>
+			<artifactId>lombok</artifactId>
+			<optional>true</optional>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-actuator-test</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-data-redis-test</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-webmvc-test</artifactId>
+			<scope>test</scope>
+		</dependency>
+	</dependencies>
+
+	<build>
+		<plugins>
+			<plugin>
+				<groupId>org.springframework.boot</groupId>
+				<artifactId>spring-boot-maven-plugin</artifactId>
+			</plugin>
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-compiler-plugin</artifactId>
+				<executions>
+					<execution>
+						<id>default-compile</id>
+						<phase>compile</phase>
+						<goals>
+							<goal>compile</goal>
+						</goals>
+						<configuration>
+							<annotationProcessorPaths>
+								<path>
+									<groupId>org.projectlombok</groupId>
+									<artifactId>lombok</artifactId>
+								</path>
+							</annotationProcessorPaths>
+						</configuration>
+					</execution>
+					<execution>
+						<id>default-testCompile</id>
+						<phase>test-compile</phase>
+						<goals>
+							<goal>testCompile</goal>
+						</goals>
+						<configuration>
+							<annotationProcessorPaths>
+								<path>
+									<groupId>org.projectlombok</groupId>
+									<artifactId>lombok</artifactId>
+								</path>
+							</annotationProcessorPaths>
+						</configuration>
+					</execution>
+				</executions>
+			</plugin>
+		</plugins>
+	</build>
+
+</project>
+
+========================================================================
+FILE: locationService\src\main\java\com\flashCab\locationService\config\RedisConfig.java
+========================================================================
+package com.flashCab.locationService.config;
+
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.data.redis.connection.RedisConnectionFactory;
+import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.serializer.StringRedisSerializer;
+
+@Configuration
+public class RedisConfig {
+    
+    @Bean
+    public RedisTemplate<String, String> redisTemplate(RedisConnectionFactory connectionFactory) {
+        RedisTemplate<String, String> template = new RedisTemplate<>();
+        template.setConnectionFactory(connectionFactory);
+        template.setKeySerializer(new StringRedisSerializer());
+        template.setValueSerializer(new StringRedisSerializer());
+        template.setHashKeySerializer(new StringRedisSerializer());
+        template.setHashValueSerializer(new StringRedisSerializer());
+        return template;
+    }
+
+}
+
+========================================================================
+FILE: locationService\src\main\java\com\flashCab\locationService\controller\LocationController.java
+========================================================================
+package com.flashCab.locationService.controller;
+
+import com.flashCab.locationService.dto.DriverLocationRequest;
+import com.flashCab.locationService.dto.NearByDriverResponse;
+import com.flashCab.locationService.service.LocationService;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+
+@RestController
+@RequestMapping("/api/v1/locations")
+@Slf4j
+@RequiredArgsConstructor
+public class LocationController {
+    private final LocationService locationService;
+
+    @PostMapping("/drivers/update")
+    public ResponseEntity<String> updateDriverLocation(@RequestBody DriverLocationRequest driverLocationRequest) {
+        locationService.updateDriverLocation(driverLocationRequest);
+        return ResponseEntity.ok("Driver location updated");
+    }
+
+    @GetMapping("/drivers/seed")
+    public ResponseEntity<String> seedDrivers(@RequestParam int count, @RequestParam double minLatitude, @RequestParam double maxLatitude, @RequestParam double minLongitude, @RequestParam double maxLongitude) {
+
+        locationService.seedDrivers(count, minLatitude, maxLatitude, minLongitude, maxLongitude);
+        return ResponseEntity.ok(count + " drivers added to Redis");
+    }
+
+    @GetMapping("/drivers/nearby")
+    public ResponseEntity<List<NearByDriverResponse>> getNearByDrivers(@RequestParam double latitude, @RequestParam double longitude, @RequestParam(defaultValue = "5.0") double radiusInKm) {
+        return ResponseEntity.ok(locationService.findNearByDrivers(latitude, longitude, radiusInKm));
+    }
+
+    @DeleteMapping("/drivers/{driverId}")
+    public ResponseEntity<String> removeDriver(@PathVariable String driverId) {
+        locationService.removeDriver(driverId);
+        return ResponseEntity.ok("Driver Removed");
+
+    }
+}
+
+========================================================================
+FILE: locationService\src\main\java\com\flashCab\locationService\dto\DriverLocationRequest.java
+========================================================================
+package com.flashCab.locationService.dto;
+
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+@Data
+@AllArgsConstructor
+@NoArgsConstructor
+public class DriverLocationRequest {
+    private String driverId;
+    private Double latitude;
+    private Double longitude;
+}
+
+========================================================================
+FILE: locationService\src\main\java\com\flashCab\locationService\dto\NearByDriverResponse.java
+========================================================================
+package com.flashCab.locationService.dto;
+
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+public class NearByDriverResponse {
+    private String driverId;
+    private Double latitude;
+    private Double longitude;
+    private Double distanceInKm;
+}
+
+========================================================================
+FILE: locationService\src\main\java\com\flashCab\locationService\LocationServiceApplication.java
+========================================================================
+package com.flashCab.locationService;
+
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+
+@SpringBootApplication
+public class LocationServiceApplication {
+
+	public static void main(String[] args) {
+		SpringApplication.run(LocationServiceApplication.class, args);
+	}
+
+}
+
+========================================================================
+FILE: locationService\src\main\java\com\flashCab\locationService\service\LocationService.java
+========================================================================
+package com.flashCab.locationService.service;
+
+import com.flashCab.locationService.dto.DriverLocationRequest;
+import com.flashCab.locationService.dto.NearByDriverResponse;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.geo.*;
+import org.springframework.data.redis.connection.RedisGeoCommands;
+import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.stereotype.Service;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.ThreadLocalRandom;
+
+@Service
+@Slf4j
+@RequiredArgsConstructor
+public class LocationService {
+
+    private static final String DRIVERS_GEO_KEY = "drivers.locations";
+    private final RedisTemplate<String, String> redisTemplate;
+
+    public void updateDriverLocation(DriverLocationRequest driverLocationRequest) {
+        log.info("Updating location for driver: {}", driverLocationRequest.getDriverId());
+        Point driverPoint = new Point(driverLocationRequest.getLongitude(), driverLocationRequest.getLatitude());
+        redisTemplate.opsForGeo().add(DRIVERS_GEO_KEY, driverPoint, driverLocationRequest.getDriverId());
+        log.info("Location updated for driver: {}", driverLocationRequest.getDriverId());
+    }
+
+    public void seedDrivers(int count, double minLat, double maxLat, double minLon, double maxLon) {
+
+        ThreadLocalRandom random = ThreadLocalRandom.current();
+
+        for (int i = 1; i <= count; i++) {
+
+            String driverId = "driver:" + i;
+
+            double latitude = random.nextDouble(minLat, maxLat);
+            double longitude = random.nextDouble(minLon, maxLon);
+
+            Point point = new Point(longitude, latitude);
+
+            redisTemplate.opsForGeo().add(
+                    DRIVERS_GEO_KEY, point, driverId
+            );
+        }
+    }
+
+    public List<NearByDriverResponse> findNearByDrivers(double latitude, double longitude, double radiusInKm) {
+        log.info("Finding drivers near lat: {} long: {} within radius: {}km", latitude, longitude, radiusInKm);
+        Circle searchArea = new Circle(new Point(longitude, latitude), new Distance(radiusInKm, Metrics.KILOMETERS));
+        GeoResults<RedisGeoCommands.GeoLocation<String>> results = redisTemplate.opsForGeo().radius(
+                DRIVERS_GEO_KEY,
+                searchArea,
+                RedisGeoCommands.GeoRadiusCommandArgs.newGeoRadiusArgs()
+                        .includeCoordinates()
+                        .includeDistance()
+                        .sortAscending()
+                        .limit(10)
+        );
+
+        List<NearByDriverResponse> nearByDrivers = new ArrayList<>();
+        if (results != null) {
+            results.getContent().forEach(result -> {
+                RedisGeoCommands.GeoLocation<String> location = result.getContent();
+                nearByDrivers.add(new NearByDriverResponse(
+                        location.getName(),
+                        location.getPoint().getY(),
+                        location.getPoint().getX(),
+                        result.getDistance().getValue()
+                ));
+            });
+        }
+        log.info("Found {} drivers nearby", nearByDrivers.size());
+        return nearByDrivers;
+    }
+
+    public void removeDriver(String driverId) {
+        log.info("Removing driver: {}", driverId);
+        redisTemplate.opsForGeo().remove(DRIVERS_GEO_KEY, driverId);
+    }
+
+
+}
+
+========================================================================
+FILE: locationService\src\main\resources\application.properties
+========================================================================
+spring.application.name=locationService
+server.port=8082
+# Redis
+spring.data.redis.host=localhost
+spring.data.redis.port=6379
+# Actuator
+management.endpoints.web.exposure.include=health, info
+
+========================================================================
+FILE: locationService\src\test\java\com\flashCab\locationService\LocationServiceApplicationTests.java
+========================================================================
+package com.flashCab.locationService;
+
+import org.junit.jupiter.api.Test;
+import org.springframework.boot.test.context.SpringBootTest;
+
+@SpringBootTest
+class LocationServiceApplicationTests {
+
+	@Test
+	void contextLoads() {
+	}
+
+}
+
+========================================================================
+FILE: matchingService\.mvn\wrapper\maven-wrapper.properties
+========================================================================
+wrapperVersion=3.3.4
+distributionType=only-script
+distributionUrl=https://repo.maven.apache.org/maven2/org/apache/maven/apache-maven/3.10.0/apache-maven-3.10.0-bin.zip
+
+========================================================================
+FILE: matchingService\pom.xml
+========================================================================
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://maven.apache.org/POM/4.0.0"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-parent</artifactId>
+        <version>4.1.2</version>
+        <relativePath/> <!-- lookup parent from repository -->
+    </parent>
+    <groupId>com.flashCab</groupId>
+    <artifactId>matchingService</artifactId>
+    <version>0.0.1-SNAPSHOT</version>
+    <name/>
+    <description/>
+    <url/>
+    <licenses>
+        <license/>
+    </licenses>
+    <developers>
+        <developer/>
+    </developers>
+    <scm>
+        <connection/>
+        <developerConnection/>
+        <tag/>
+        <url/>
+    </scm>
+    <properties>
+        <java.version>17</java.version>
+        <spring-cloud.version>2025.1.4</spring-cloud.version>
+    </properties>
+    <dependencies>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-actuator</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-kafka</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-webmvc</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <optional>true</optional>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-actuator-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-kafka-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-webmvc-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.cloud</groupId>
+            <artifactId>spring-cloud-starter-openfeign</artifactId>
+        </dependency>
+
+    </dependencies>
+
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>org.springframework.cloud</groupId>
+                <artifactId>spring-cloud-dependencies</artifactId>
+                <version>${spring-cloud.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>default-compile</id>
+                        <phase>compile</phase>
+                        <goals>
+                            <goal>compile</goal>
+                        </goals>
+                        <configuration>
+                            <annotationProcessorPaths>
+                                <path>
+                                    <groupId>org.projectlombok</groupId>
+                                    <artifactId>lombok</artifactId>
+                                </path>
+                            </annotationProcessorPaths>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>default-testCompile</id>
+                        <phase>test-compile</phase>
+                        <goals>
+                            <goal>testCompile</goal>
+                        </goals>
+                        <configuration>
+                            <annotationProcessorPaths>
+                                <path>
+                                    <groupId>org.projectlombok</groupId>
+                                    <artifactId>lombok</artifactId>
+                                </path>
+                            </annotationProcessorPaths>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+
+</project>
+
+========================================================================
+FILE: matchingService\src\main\java\com\flashCab\matchingService\client\LocationServiceClient.java
+========================================================================
+package com.flashCab.matchingService.client;
+
+import com.flashCab.matchingService.dto.NearByDriverResponse;
+import org.springframework.cloud.openfeign.FeignClient;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+
+import java.util.List;
+
+@FeignClient(name = "locationService", url = "${location.service.url}")
+public interface LocationServiceClient {
+    @GetMapping("/api/v1/locations/drivers/nearby")
+    List<NearByDriverResponse> getNearByDrivers(@RequestParam double latitude,
+                                                @RequestParam double longitude,
+                                                @RequestParam double radiusInKm);
+}
+
+========================================================================
+FILE: matchingService\src\main\java\com\flashCab\matchingService\dto\NearByDriverResponse.java
+========================================================================
+package com.flashCab.matchingService.dto;
+
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+public class NearByDriverResponse {
+
+    private String driverId;
+    private Double latitude;
+    private Double longitude;
+    private Double distanceInKm;
+
+}
+
+========================================================================
+FILE: matchingService\src\main\java\com\flashCab\matchingService\event\RideMatchedEvent.java
+========================================================================
+package com.flashCab.matchingService.event;
+
+
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+public class RideMatchedEvent {
+
+    private String rideId;
+
+    private String riderId;
+
+    private String driverId;
+
+    private Double driverLatitude;
+
+    private Double driverLongitude;
+
+    private Double distanceToPickupKm;
+
+}
+
+========================================================================
+FILE: matchingService\src\main\java\com\flashCab\matchingService\event\RideRequestedEvent.java
+========================================================================
+package com.flashCab.matchingService.event;
+
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+@Data
+@AllArgsConstructor
+@NoArgsConstructor
+public class RideRequestedEvent {
+
+    private String riderId;
+
+    private String rideId;
+
+    private Double pickupLatitude;
+
+    private Double pickupLongitude;
+
+    private String pickupAddress;
+
+    private Double dropLatitude;
+
+    private Double dropLongitude;
+
+    private String dropAddress;
+}
+
+========================================================================
+FILE: matchingService\src\main\java\com\flashCab\matchingService\MatchingServiceApplication.java
+========================================================================
+package com.flashCab.matchingService;
+
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.cloud.openfeign.EnableFeignClients;
+
+@SpringBootApplication
+@EnableFeignClients
+public class MatchingServiceApplication {
+
+    public static void main(String[] args) {
+        SpringApplication.run(MatchingServiceApplication.class, args);
+    }
+
+}
+
+========================================================================
+FILE: matchingService\src\main\java\com\flashCab\matchingService\service\MatchingService.java
+========================================================================
+package com.flashCab.matchingService.service;
+
+
+import com.flashCab.matchingService.client.LocationServiceClient;
+import com.flashCab.matchingService.dto.NearByDriverResponse;
+import com.flashCab.matchingService.event.RideMatchedEvent;
+import com.flashCab.matchingService.event.RideRequestedEvent;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.kafka.core.KafkaTemplate;
+import org.springframework.stereotype.Service;
+
+import java.util.Comparator;
+import java.util.List;
+import java.util.Optional;
+
+@Service
+@Slf4j
+@RequiredArgsConstructor
+public class MatchingService {
+
+    private static final String RIDE_MATCHED_TOPIC = "ride.matched";
+    private static final double DEFAULT_SEARCH_RADIUS_KM = 100.0;
+    private final LocationServiceClient locationServiceClient;
+    private final KafkaTemplate<String, RideMatchedEvent> kafkaTemplate;
+
+    public void matchDriverForRide(RideRequestedEvent event) {
+
+        List<NearByDriverResponse> nearByDrivers = locationServiceClient.getNearByDrivers(
+                event.getPickupLatitude(),
+                event.getPickupLongitude(),
+                DEFAULT_SEARCH_RADIUS_KM
+        );
+
+        if (nearByDrivers.isEmpty()) {
+            log.warn("Not drivers found near ride");
+            return;
+        }
+
+        Optional<NearByDriverResponse> bestDriver = findBestDriver(nearByDrivers);
+        if (bestDriver.isEmpty()) {
+            log.warn("Could not find suitable driver for ride");
+            return;
+        }
+
+        NearByDriverResponse assignedDriver = bestDriver.get();
+        RideMatchedEvent matchedEvent = new RideMatchedEvent(
+                event.getRideId(),
+                event.getRiderId(),
+                assignedDriver.getDriverId(),
+                assignedDriver.getLatitude(),
+                assignedDriver.getLongitude(),
+                assignedDriver.getDistanceInKm()
+        );
+        kafkaTemplate.send(RIDE_MATCHED_TOPIC, event.getRideId(), matchedEvent);
+        log.info("RideMatchedEvent published");
+    }
+
+    private Optional<NearByDriverResponse> findBestDriver(List<NearByDriverResponse> drivers) {
+        double distanceWeight = 0.7;
+        double ratingWeight = 0.3;
+        return drivers.stream().max(Comparator.comparingDouble(driver -> {
+            double distanceScore = 1.0 / (driver.getDistanceInKm() + 0.1);
+            // Simulated Rating between 4.0 and 5.0
+            // in prod fetch from driver service
+            double simulatedRating = 4.0 + Math.random();
+            return (distanceScore * distanceWeight) + (simulatedRating * ratingWeight);
+        }));
+    }
+
+}
+
+========================================================================
+FILE: matchingService\src\main\java\com\flashCab\matchingService\service\RideEventConsumer.java
+========================================================================
+package com.flashCab.matchingService.service;
+
+import com.flashCab.matchingService.event.RideRequestedEvent;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.kafka.annotation.KafkaListener;
+import org.springframework.stereotype.Service;
+
+@RequiredArgsConstructor
+@Service
+@Slf4j
+public class RideEventConsumer {
+    private final MatchingService matchingService;
+
+    @KafkaListener(topics = "ride.requested", groupId = "matching-service-group")
+    public void consumeRideRequestedEvent(RideRequestedEvent event) {
+        try {
+            matchingService.matchDriverForRide(event);
+        } catch (Exception e) {
+            log.error("Error processing ride request: {} - {}", event.getRideId(), e.getMessage());
+            // in prod send to dead letter queue for retry
+        }
+    }
+
+}
+
+========================================================================
+FILE: matchingService\src\main\resources\application.yaml
+========================================================================
+spring:
+  application:
+    name: matchingService
+
+  kafka:
+    bootstrap-servers: localhost:9092
+
+    consumer:
+      group-id: matching-service-group
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.JacksonJsonDeserializer
+      properties:
+        spring.json.trusted.packages: "com.flashCab.matchingService.event"
+        spring.json.value.default.type: "com.flashCab.matchingService.event.RideRequestedEvent"
+        spring.json.use.type.headers: false
+
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JacksonJsonSerializer
+
+location:
+  service:
+    url: http://localhost:8082
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, info
+
+server:
+  port: 8084
+
+========================================================================
+FILE: matchingService\src\test\java\com\flashCab\matchingService\MatchingServiceApplicationTests.java
+========================================================================
+package com.flashCab.matchingService;
+
+import org.junit.jupiter.api.Test;
+import org.springframework.boot.test.context.SpringBootTest;
+
+@SpringBootTest
+class MatchingServiceApplicationTests {
+
+	@Test
+	void contextLoads() {
+	}
+
+}
+
+========================================================================
+FILE: rideService\.mvn\wrapper\maven-wrapper.properties
+========================================================================
+wrapperVersion=3.3.4
+distributionType=only-script
+distributionUrl=https://repo.maven.apache.org/maven2/org/apache/maven/apache-maven/3.10.0/apache-maven-3.10.0-bin.zip
+
+========================================================================
+FILE: rideService\pom.xml
+========================================================================
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+	<modelVersion>4.0.0</modelVersion>
+	<parent>
+		<groupId>org.springframework.boot</groupId>
+		<artifactId>spring-boot-starter-parent</artifactId>
+		<version>4.1.2</version>
+		<relativePath/> <!-- lookup parent from repository -->
+	</parent>
+	<groupId>com.flashCab</groupId>
+	<artifactId>rideService</artifactId>
+	<version>0.0.1-SNAPSHOT</version>
+	<name/>
+	<description/>
+	<url/>
+	<licenses>
+		<license/>
+	</licenses>
+	<developers>
+		<developer/>
+	</developers>
+	<scm>
+		<connection/>
+		<developerConnection/>
+		<tag/>
+		<url/>
+	</scm>
+	<properties>
+		<java.version>17</java.version>
+	</properties>
+	<dependencies>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-actuator</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-data-jpa</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-kafka</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-validation</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-webmvc</artifactId>
+		</dependency>
+
+		<dependency>
+			<groupId>com.mysql</groupId>
+			<artifactId>mysql-connector-j</artifactId>
+			<scope>runtime</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.projectlombok</groupId>
+			<artifactId>lombok</artifactId>
+			<optional>true</optional>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-actuator-test</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-data-jpa-test</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-kafka-test</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-validation-test</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-webmvc-test</artifactId>
+			<scope>test</scope>
+		</dependency>
+	</dependencies>
+
+	<build>
+		<plugins>
+			<plugin>
+				<groupId>org.springframework.boot</groupId>
+				<artifactId>spring-boot-maven-plugin</artifactId>
+			</plugin>
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-compiler-plugin</artifactId>
+				<executions>
+					<execution>
+						<id>default-compile</id>
+						<phase>compile</phase>
+						<goals>
+							<goal>compile</goal>
+						</goals>
+						<configuration>
+							<annotationProcessorPaths>
+								<path>
+									<groupId>org.projectlombok</groupId>
+									<artifactId>lombok</artifactId>
+								</path>
+							</annotationProcessorPaths>
+						</configuration>
+					</execution>
+					<execution>
+						<id>default-testCompile</id>
+						<phase>test-compile</phase>
+						<goals>
+							<goal>testCompile</goal>
+						</goals>
+						<configuration>
+							<annotationProcessorPaths>
+								<path>
+									<groupId>org.projectlombok</groupId>
+									<artifactId>lombok</artifactId>
+								</path>
+							</annotationProcessorPaths>
+						</configuration>
+					</execution>
+				</executions>
+			</plugin>
+		</plugins>
+	</build>
+
+</project>
+
+========================================================================
+FILE: rideService\src\main\java\com\flashCab\rideService\config\KafkaConfig.java
+========================================================================
+package com.flashCab.rideService.config;
+
+
+import org.apache.kafka.clients.admin.NewTopic;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.kafka.config.TopicBuilder;
+
+@Configuration
+public class KafkaConfig {
+
+    @Bean
+    public NewTopic rideRequestedTopic() {
+        return TopicBuilder.name("ride.requested").partitions(3).replicas(1).build();
+    }
+
+    @Bean
+    public NewTopic rideMatchedTopic() {
+        return TopicBuilder.name("ride.matched").partitions(3).replicas(1).build();
+    }
+
+}
+
+========================================================================
+FILE: rideService\src\main\java\com\flashCab\rideService\controller\GlobalExceptionHandler.java
+========================================================================
+package com.flashCab.rideService.controller;
+
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.annotation.RestControllerAdvice;
+
+import java.util.HashMap;
+import java.util.Map;
+
+@RestControllerAdvice
+@Slf4j
+public class GlobalExceptionHandler {
+
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    public ResponseEntity<Map<String, String>> handleValidationError(MethodArgumentNotValidException ex) {
+        Map<String, String> errors = new HashMap<>();
+        ex.getBindingResult().getFieldErrors()
+                .forEach(error -> errors.put(error.getField(), error.getDefaultMessage()));
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errors);
+    }
+
+    @ExceptionHandler(RuntimeException.class)
+    public ResponseEntity<Map<String, String>> handleRuntimeException(RuntimeException ex) {
+        log.error("Runtime exception: {}", ex.getMessage());
+        Map<String, String> errors = new HashMap<>();
+        errors.put("error", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errors);
+    }
+}
+
+========================================================================
+FILE: rideService\src\main\java\com\flashCab\rideService\controller\RideController.java
+========================================================================
+package com.flashCab.rideService.controller;
+
+
+import com.flashCab.rideService.dto.RideRequest;
+import com.flashCab.rideService.dto.RideResponse;
+import com.flashCab.rideService.service.RideService;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+
+@RestController
+@RequestMapping("/api/v1/rides")
+@RequiredArgsConstructor
+@Slf4j
+public class RideController {
+    private final RideService rideService;
+
+    @PostMapping("/request")
+    public ResponseEntity<RideResponse> requestRide(@Valid @RequestBody RideRequest request) {
+        log.info("Ride request received from rider: {}", request.getRiderId());
+        return ResponseEntity.status(HttpStatus.CREATED).body(rideService.requestRide(request));
+    }
+
+    @GetMapping("/{rideId}")
+    public ResponseEntity<RideResponse> getRideById(@PathVariable String rideId) {
+        return ResponseEntity.ok(rideService.getRideById(rideId));
+    }
+
+    @GetMapping("/rider/{riderId}")
+    public ResponseEntity<List<RideResponse>> getRidesByRider(@PathVariable String riderId) {
+        return ResponseEntity.ok(rideService.getRidesByRider(riderId));
+    }
+
+    @PutMapping("/{rideId}/start")
+    public ResponseEntity<RideResponse> startRide(@PathVariable String rideId) {
+        return ResponseEntity.ok(rideService.startRide(rideId));
+    }
+
+    @PutMapping("/{rideId}/complete")
+    public ResponseEntity<RideResponse> completeRide(@PathVariable String rideId) {
+        return ResponseEntity.ok(rideService.completeRide(rideId));
+    }
+
+    @PutMapping("/{rideId}/cancel")
+    public ResponseEntity<RideResponse> cancelRide(@PathVariable String rideId) {
+        return ResponseEntity.ok(rideService.cancelRide(rideId));
+    }
+}
+
+========================================================================
+FILE: rideService\src\main\java\com\flashCab\rideService\dto\RideRequest.java
+========================================================================
+package com.flashCab.rideService.dto;
+
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+public class RideRequest {
+
+    @NotBlank(message = "Rider id is required")
+    private String riderId;
+
+    @NotNull(message = "Pickup latitude id is required")
+    private Double pickupLatitude;
+
+    @NotNull(message = "Pickup longitude id is required")
+    private Double pickupLongitude;
+
+    @NotBlank(message = "Pickup address is required")
+    private String pickupAddress;
+
+    @NotNull(message = "Drop latitude id is required")
+    private Double dropLatitude;
+
+    @NotNull(message = "Drop latitude id is required")
+    private Double dropLongitude;
+
+    @NotBlank(message = "Drop address is required")
+    private String dropAddress;
+
+}
+
+========================================================================
+FILE: rideService\src\main\java\com\flashCab\rideService\dto\RideResponse.java
+========================================================================
+package com.flashCab.rideService.dto;
+
+import com.flashCab.rideService.model.RideStatus;
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+import java.time.LocalDateTime;
+
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+public class RideResponse {
+    private String id;
+
+    private String riderId;
+
+    private String driverId;
+
+    private Double pickupLatitude;
+
+    private Double pickupLongitude;
+
+    private String pickupAddress;
+
+    private Double dropLatitude;
+
+    private Double dropLongitude;
+
+    private String dropAddress;
+
+    private RideStatus status;
+
+    private Double estimatedFare;
+
+    private Double actualFare;
+
+    private LocalDateTime createdAt;
+    
+    private LocalDateTime startedAt;
+
+    private LocalDateTime completedAt;
+}
+
+========================================================================
+FILE: rideService\src\main\java\com\flashCab\rideService\event\RideMatchedEvent.java
+========================================================================
+package com.flashCab.rideService.event;
+
+
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+public class RideMatchedEvent {
+
+    private String rideId;
+
+    private String riderId;
+
+    private String driverId;
+
+    private Double driverLatitude;
+
+    private Double driverLongitude;
+
+    private Double distanceToPickupKm;
+
+}
+
+========================================================================
+FILE: rideService\src\main\java\com\flashCab\rideService\event\RideRequestedEvent.java
+========================================================================
+package com.flashCab.rideService.event;
+
+
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+@Data
+@AllArgsConstructor
+@NoArgsConstructor
+public class RideRequestedEvent {
+    private String rideId;
+
+    private String riderId;
+
+    private Double pickupLatitude;
+
+    private Double pickupLongitude;
+
+    private String pickupAddress;
+
+    private Double dropLatitude;
+
+    private Double dropLongitude;
+
+    private String dropAddress;
+}
+
+========================================================================
+FILE: rideService\src\main\java\com\flashCab\rideService\model\Ride.java
+========================================================================
+package com.flashCab.rideService.model;
+
+import jakarta.persistence.*;
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.UpdateTimestamp;
+import org.hibernate.annotations.UuidGenerator;
+
+import java.time.LocalDateTime;
+
+@Entity
+@Table(name = "rides")
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+public class Ride {
+//    @Id
+//    @GeneratedValue(strategy = GenerationType.IDENTITY)
+//    private String id;
+
+    @Id
+    @GeneratedValue
+    @UuidGenerator
+    private String id;
+
+    @Column(nullable = false)
+    private String riderId;
+
+    private String driverId;
+
+    @Column(nullable = false)
+    private Double pickupLatitude;
+
+    @Column(nullable = false)
+    private Double pickupLongitude;
+
+    @Column(nullable = false)
+    private String pickupAddress;
+
+    @Column(nullable = false)
+    private Double dropLatitude;
+
+    @Column(nullable = false)
+    private Double dropLongitude;
+
+    @Column(nullable = false)
+    private String dropAddress;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private RideStatus status;
+
+    private Double estimatedFare;
+
+    private Double actualFare;
+
+    @CreationTimestamp
+    private LocalDateTime createdAt;
+
+    @UpdateTimestamp
+    private LocalDateTime updatedAt;
+
+    private LocalDateTime startedAt;
+
+    private LocalDateTime completedAt;
+
+}
+
+========================================================================
+FILE: rideService\src\main\java\com\flashCab\rideService\model\RideStatus.java
+========================================================================
+package com.flashCab.rideService.model;
+
+public enum RideStatus {
+    REQUESTED,
+    MATCHING,
+    ACCEPTED,
+    DRIVER_ARRIVING,
+    RIDE_STARTED,
+    COMPLETED,
+    CANCELLED
+}
+
+========================================================================
+FILE: rideService\src\main\java\com\flashCab\rideService\repository\RideRepository.java
+========================================================================
+package com.flashCab.rideService.repository;
+
+import com.flashCab.rideService.model.Ride;
+import org.springframework.data.jpa.repository.JpaRepository;
+
+import java.util.List;
+
+public interface RideRepository extends JpaRepository<Ride, String> {
+    List<Ride> findByRiderIdOrderByCreatedAtDesc(String riderId);
+}
+
+========================================================================
+FILE: rideService\src\main\java\com\flashCab\rideService\RideServiceApplication.java
+========================================================================
+package com.flashCab.rideService;
+
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+
+@SpringBootApplication
+public class RideServiceApplication {
+
+	public static void main(String[] args) {
+		SpringApplication.run(RideServiceApplication.class, args);
+	}
+
+}
+
+========================================================================
+FILE: rideService\src\main\java\com\flashCab\rideService\service\RideEventConsumer.java
+========================================================================
+package com.flashCab.rideService.service;
+
+import com.flashCab.rideService.event.RideMatchedEvent;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.kafka.annotation.KafkaListener;
+import org.springframework.stereotype.Service;
+
+@Service
+@Slf4j
+@RequiredArgsConstructor
+public class RideEventConsumer {
+
+    private final RideService rideService;
+
+    @KafkaListener(topics = "ride.matched", groupId = "ride-service-group")
+    public void consumeRideMatchedEvent(RideMatchedEvent event) {
+        rideService.updateRideWithDriver(event.getRideId(), event.getDriverId());
+
+    }
+
+}
+
+========================================================================
+FILE: rideService\src\main\java\com\flashCab\rideService\service\RideService.java
+========================================================================
+package com.flashCab.rideService.service;
+
+import com.flashCab.rideService.dto.RideRequest;
+import com.flashCab.rideService.dto.RideResponse;
+import com.flashCab.rideService.event.RideRequestedEvent;
+import com.flashCab.rideService.model.Ride;
+import com.flashCab.rideService.model.RideStatus;
+import com.flashCab.rideService.repository.RideRepository;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.kafka.core.KafkaTemplate;
+import org.springframework.stereotype.Service;
+
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.stream.Collectors;
+
+@Service
+@RequiredArgsConstructor
+@Slf4j
+public class RideService {
+
+    private static final String RIDE_REQUESTED_TOPIC = "ride.requested";
+    private final RideRepository rideRepository;
+    private final KafkaTemplate<String, RideRequestedEvent> kafkaTemplate;
+
+    public RideResponse requestRide(RideRequest request) {
+        log.info("New ride request from rider: {}", request.getRiderId());
+        Ride ride = new Ride();
+        ride.setRiderId(request.getRiderId());
+        ride.setPickupLatitude(request.getPickupLatitude());
+        ride.setPickupLongitude(request.getPickupLongitude());
+        ride.setPickupAddress(request.getPickupAddress());
+        ride.setDropLatitude(request.getDropLatitude());
+        ride.setDropLongitude(request.getDropLongitude());
+        ride.setDropAddress(request.getDropAddress());
+        ride.setStatus(RideStatus.REQUESTED);
+        ride.setEstimatedFare(calculateEstimateFare(request));
+
+        Ride savedRide = rideRepository.save(ride);
+
+        RideRequestedEvent event = new RideRequestedEvent(
+                savedRide.getId(),
+                savedRide.getRiderId(),
+                savedRide.getPickupLatitude(),
+                savedRide.getPickupLongitude(),
+                savedRide.getPickupAddress(),
+                savedRide.getDropLatitude(),
+                savedRide.getDropLongitude(),
+                savedRide.getDropAddress()
+        );
+
+        kafkaTemplate.send(RIDE_REQUESTED_TOPIC, savedRide.getId(), event);
+        log.info("Ride requested event published to Kafka for ride: {}", savedRide.getId());
+        savedRide.setStatus(RideStatus.MATCHING);
+        rideRepository.save(savedRide);
+        return mapToResponse(savedRide);
+    }
+
+
+    public void updateRideWithDriver(String rideId, String driverId) {
+
+        Ride ride = rideRepository.findById(rideId).orElseThrow(() -> new RuntimeException("Ride not found"));
+        ride.setDriverId(driverId);
+        ride.setStatus(RideStatus.ACCEPTED);
+        rideRepository.save(ride);
+
+    }
+
+    public RideResponse startRide(String rideId) {
+        Ride ride = rideRepository.findById(rideId).orElseThrow(() -> new RuntimeException("Ride not found"));
+        if (ride.getStatus() != RideStatus.ACCEPTED) {
+            throw new RuntimeException("Ride cannot be started, Current status: " + ride.getStatus());
+        }
+        ride.setStatus(RideStatus.RIDE_STARTED);
+        ride.setStartedAt(LocalDateTime.now());
+        rideRepository.save(ride);
+        return mapToResponse(ride);
+    }
+
+    public RideResponse completeRide(String rideId) {
+
+        Ride ride = rideRepository.findById(rideId).orElseThrow(() -> new RuntimeException("Ride not found"));
+        if (ride.getStatus() != RideStatus.RIDE_STARTED) {
+            throw new RuntimeException("Ride cannot be completed, Current status: " + ride.getStatus());
+        }
+        ride.setStatus(RideStatus.COMPLETED);
+        ride.setCompletedAt(LocalDateTime.now());
+        ride.setActualFare(ride.getEstimatedFare());
+        rideRepository.save(ride);
+        return mapToResponse(ride);
+    }
+
+    public RideResponse cancelRide(String rideId) {
+        Ride ride = rideRepository.findById(rideId).orElseThrow(() -> new RuntimeException("Ride not found"));
+        ride.setStatus(RideStatus.CANCELLED);
+        rideRepository.save(ride);
+        return mapToResponse(ride);
+    }
+
+    public RideResponse getRideById(String rideId) {
+        Ride ride = rideRepository.findById(rideId).orElseThrow(() -> new RuntimeException("Ride not found"));
+        return mapToResponse(ride);
+    }
+
+    public List<RideResponse> getRidesByRider(String riderId) {
+        return rideRepository.findByRiderIdOrderByCreatedAtDesc(riderId)
+                .stream()
+                .map(this::mapToResponse)
+                .collect(Collectors.toList());
+
+    }
+
+
+    private Double calculateEstimateFare(RideRequest request) {
+        double lat1 = Math.toRadians(request.getPickupLatitude());
+        double lat2 = Math.toRadians(request.getDropLatitude());
+        double lon1 = Math.toRadians(request.getPickupLongitude());
+        double lon2 = Math.toRadians(request.getDropLongitude());
+        double latDiff = lat2 - lat1;
+        double lonDiff = lon1 - lon2;
+
+        double a = Math.pow(Math.sin(latDiff / 2), 2) + Math.cos(lat1) * Math.cos(lat2) * Math.pow(Math.sin(lonDiff / 2), 2);
+        double c = 2 * Math.asin(Math.sqrt(a));
+        double distanceKm = 6371 * c;
+        double fare = 50 + (distanceKm * 12);
+        return Math.round(fare * 100.0) / 100.0;
+    }
+
+    private RideResponse mapToResponse(Ride savedRide) {
+        RideResponse response = new RideResponse();
+
+        response.setId(savedRide.getId());
+        response.setRiderId(savedRide.getRiderId());
+        response.setDriverId(savedRide.getDriverId());
+
+        response.setPickupLatitude(savedRide.getPickupLatitude());
+        response.setPickupLongitude(savedRide.getPickupLongitude());
+        response.setPickupAddress(savedRide.getPickupAddress());
+
+        response.setDropLatitude(savedRide.getDropLatitude());
+        response.setDropLongitude(savedRide.getDropLongitude());
+        response.setDropAddress(savedRide.getDropAddress());
+
+        response.setStatus(savedRide.getStatus());
+
+        response.setEstimatedFare(savedRide.getEstimatedFare());
+        response.setActualFare(savedRide.getActualFare());
+
+        response.setCreatedAt(savedRide.getCreatedAt());
+        response.setStartedAt(savedRide.getStartedAt());
+        response.setCompletedAt(savedRide.getCompletedAt());
+
+        return response;
+    }
+
+
+}
+
+========================================================================
+FILE: rideService\src\main\resources\application.yaml
+========================================================================
+spring:
+  application:
+    name: rideService
+  datasource:
+    url: jdbc:mysql://localhost:3306/flashcab
+    username: root
+    password: ${DB_PASSWORD}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: create
+    show-sql: true
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.MySQLDialect
+
+
+  kafka:
+    bootstrap-servers: localhost:9092
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JacksonJsonSerializer
+    consumer:
+      group-id: ride-service-group
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.JacksonJsonDeserializer
+      properties:
+        spring.json.trusted.packages: "*"
+        spring.json.use.type.headers: false
+        spring.json.value.default.type: "com.flashCab.rideService.event.RideMatchedEvent"
+
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, info
+
+
+server:
+  port: 8083
+
+========================================================================
+FILE: rideService\src\test\java\com\flashCab\rideService\RideServiceApplicationTests.java
+========================================================================
+package com.flashCab.rideService;
+
+import org.junit.jupiter.api.Test;
+import org.springframework.boot.test.context.SpringBootTest;
+
+@SpringBootTest
+class RideServiceApplicationTests {
+
+	@Test
+	void contextLoads() {
+	}
+
+}
+

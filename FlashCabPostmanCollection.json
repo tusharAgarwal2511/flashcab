@@ -2,7 +2,7 @@
   "info": {
     "_postman_id": "7cdd2e35-9e7c-4d63-9d7c-4a4f8a3f2b11",
     "name": "FlashCab API Tests",
-    "description": "Postman Collection v2.1.0. Local Location Service (8081) and Ride Service (8083). Update sample DTO bodies to match your Java DTO definitions.",
+    "description": "Postman Collection v2.1.0. Local Location Service (8081), Ride Service (8083), Driver Service (8085), and Rider Service (8086).",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
@@ -14,6 +14,26 @@
     {
       "key": "rideBaseUrl",
       "value": "http://localhost:8083",
+      "type": "string"
+    },
+    {
+      "key": "driverBaseUrl",
+      "value": "http://localhost:8085",
+      "type": "string"
+    },
+    {
+      "key": "driverServiceDriverId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "riderBaseUrl",
+      "value": "http://localhost:8086",
+      "type": "string"
+    },
+    {
+      "key": "riderServiceRiderId",
+      "value": "",
       "type": "string"
     },
     {
@@ -82,11 +102,11 @@
                   "pm.test('Status is 200', function () { pm.response.to.have.status(200); });",
                   "pm.test('Location update confirmation', function () { pm.expect(pm.response.text()).to.include('Driver location updated'); });"
                 ]
+                }
               }
-            }
           ]
-        },
-        {
+      },
+      {
           "name": "2 - Find Nearby Drivers",
           "request": {
             "method": "GET",
@@ -273,6 +293,297 @@
                 "exec": [
                   "pm.test('Status is 200', function () { pm.response.to.have.status(200); });",
                   "pm.test('Response is JSON', function () { pm.response.to.be.json; });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+          "name": "Driver Service",
+          "item": [
+            {
+              "name": "1 - Register Driver",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": "{{driverBaseUrl}}/api/v1/drivers",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"Jordan Driver\",\n  \"email\": \"jordan.driver@example.com\",\n  \"phone\": \"+15551234567\",\n  \"vehicleType\": \"SEDAN\",\n  \"vehicleNumber\": \"ABC1234\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Status is 201 Created', function () { pm.response.to.have.status(201); });",
+                      "pm.test('Response is JSON', function () { pm.response.to.be.json; });",
+                      "const responseBody = pm.response.json();",
+                      "const createdDriverId = responseBody.id;",
+                      "pm.test('Generated driver ID is returned', function () { pm.expect(createdDriverId).to.be.a('string').and.not.empty; });",
+                      "pm.test('Response does not include status', function () { pm.expect(responseBody).not.to.have.property('status'); });",
+                      "pm.test('Response includes createdAt', function () { pm.expect(responseBody.createdAt).to.be.a('string').and.not.empty; });",
+                      "if (createdDriverId) {",
+                      "    pm.collectionVariables.set('driverServiceDriverId', String(createdDriverId));",
+                      "    console.log('Saved driverId:', createdDriverId);",
+                      "}"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "2 - Get All Drivers",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": "{{driverBaseUrl}}/api/v1/drivers"
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Status is 200', function () { pm.response.to.have.status(200); });",
+                      "pm.test('Response is an array', function () { pm.expect(pm.response.json()).to.be.an('array'); });"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "3 - Get Driver By ID",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": "{{driverBaseUrl}}/api/v1/drivers/{{driverServiceDriverId}}",
+                "description": "Run after Register Driver; that request saves the generated MongoDB ID to the driverServiceDriverId collection variable."
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Status is 200', function () { pm.response.to.have.status(200); });",
+                      "pm.test('Response is JSON', function () { pm.response.to.be.json; });"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "4 - Update Driver",
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": "{{driverBaseUrl}}/api/v1/drivers/{{driverServiceDriverId}}",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"Jordan Driver\",\n  \"email\": \"jordan.driver@example.com\",\n  \"phone\": \"+15551234567\",\n  \"vehicleType\": \"SEDAN\",\n  \"vehicleNumber\": \"ABC1234\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Status is 200', function () { pm.response.to.have.status(200); });",
+                      "pm.test('Response is JSON', function () { pm.response.to.be.json; });"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "5 - Delete Driver",
+              "request": {
+                "method": "DELETE",
+                "header": [],
+                "url": "{{driverBaseUrl}}/api/v1/drivers/{{driverServiceDriverId}}",
+                "description": "Run after registering a driver. The endpoint returns 204 No Content."
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Status is 204 No Content', function () { pm.response.to.have.status(204); });"
+                    ]
+                  }
+                }
+              ]
+            }
+      ]
+    },
+    {
+      "name": "Rider Service",
+      "item": [
+        {
+          "name": "1 - Register Rider",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{riderBaseUrl}}/api/v1/riders",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Taylor Rider\",\n  \"email\": \"taylor.rider@example.com\",\n  \"phone\": \"+15557654321\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 201 Created', function () { pm.response.to.have.status(201); });",
+                  "pm.test('Response is JSON', function () { pm.response.to.be.json; });",
+                  "const responseBody = pm.response.json();",
+                  "pm.test('Generated rider ID and timestamps are returned', function () {",
+                  "    pm.expect(responseBody.id).to.be.a('string').and.not.empty;",
+                  "    pm.expect(responseBody.createdAt).to.be.a('string').and.not.empty;",
+                  "    pm.expect(responseBody.updatedAt).to.be.a('string').and.not.empty;",
+                  "});",
+                  "if (responseBody.id) {",
+                  "    pm.collectionVariables.set('riderServiceRiderId', responseBody.id);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "2 - Get All Riders",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{riderBaseUrl}}/api/v1/riders"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Response is an array', function () { pm.expect(pm.response.json()).to.be.an('array'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "3 - Get Rider By ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{riderBaseUrl}}/api/v1/riders/{{riderServiceRiderId}}",
+            "description": "Run after Register Rider; its test saves the generated UUID to riderServiceRiderId."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Returned rider ID matches the saved ID', function () { pm.expect(pm.response.json().id).to.eql(pm.collectionVariables.get('riderServiceRiderId')); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "4 - Update Rider",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{riderBaseUrl}}/api/v1/riders/{{riderServiceRiderId}}",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Taylor Rider Updated\",\n  \"email\": \"taylor.updated@example.com\",\n  \"phone\": \"+15559876543\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Updated rider fields are returned', function () {",
+                  "    const responseBody = pm.response.json();",
+                  "    pm.expect(responseBody.name).to.eql('Taylor Rider Updated');",
+                  "    pm.expect(responseBody.email).to.eql('taylor.updated@example.com');",
+                  "    pm.expect(responseBody.updatedAt).to.be.a('string').and.not.empty;",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "5 - Delete Rider",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": "{{riderBaseUrl}}/api/v1/riders/{{riderServiceRiderId}}",
+            "description": "Run after registering a rider. The endpoint returns 204 No Content."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 204 No Content', function () { pm.response.to.have.status(204); });"
                 ]
               }
             }
