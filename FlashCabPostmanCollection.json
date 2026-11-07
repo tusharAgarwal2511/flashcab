@@ -219,6 +219,7 @@
                   "pm.test('Status is 201 Created', function () { pm.response.to.have.status(201); });",
                   "pm.test('Response is JSON', function () { pm.response.to.be.json; });",
                   "const responseBody = pm.response.json();",
+                  "pm.test('Estimated fare is returned', function () { pm.expect(responseBody.estimatedFare).to.be.a('number'); });",
                   "const createdRideId = responseBody.rideId || responseBody.id;",
                   "pm.test('Generated ride ID is returned', function () { pm.expect(createdRideId).to.be.a('string').and.not.empty; });",
                   "if (createdRideId !== undefined && createdRideId !== null) {",

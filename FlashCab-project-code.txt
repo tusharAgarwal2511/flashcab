@@ -64,7 +64,10 @@ volumes:
 networks:
   flashcab:
     driver: bridge
-
+FILE: driverService\.gitattributes
+========================================================================
+/mvnw text eol=lf
+*.cmd text eol=crlf
 FILE: driverService\.gitignore
 ========================================================================
 HELP.md
@@ -100,13 +103,11 @@ build/
 
 ### VS Code ###
 .vscode/
-
 FILE: driverService\.mvn\wrapper\maven-wrapper.properties
 ========================================================================
 wrapperVersion=3.3.4
 distributionType=only-script
 distributionUrl=https://repo.maven.apache.org/maven2/org/apache/maven/apache-maven/3.10.0/apache-maven-3.10.0-bin.zip
-
 FILE: driverService\HELP.md
 ========================================================================
 # Getting Started
@@ -136,7 +137,6 @@ Due to Maven's design, elements are inherited from the parent POM to the project
 While most of the inheritance is fine, it also inherits unwanted elements like `<license>` and `<developers>` from the parent.
 To prevent this, the project POM contains empty overrides for these elements.
 If you manually switch to a different parent and actually want the inheritance, you need to remove those overrides.
-
 FILE: driverService\mvnw
 ========================================================================
 #!/bin/sh
@@ -434,7 +434,6 @@ mv -- "$TMP_DOWNLOAD_DIR/$actualDistributionDir" "$MAVEN_HOME" || [ -d "$MAVEN_H
 
 clean || :
 exec_maven "$@"
-
 FILE: driverService\mvnw.cmd
 ========================================================================
 <# : batch portion
@@ -626,7 +625,6 @@ try {
 }
 
 Write-Output "MVN_CMD=$MAVEN_HOME/bin/$MVN_CMD"
-
 FILE: driverService\pom.xml
 ========================================================================
 <?xml version="1.0" encoding="UTF-8"?>
@@ -768,7 +766,6 @@ FILE: driverService\pom.xml
 	</build>
 
 </project>
-
 FILE: driverService\src\main\java\com\flashCab\driverService\client\LocationServiceClient.java
 ========================================================================
 package com.flashCab.driverService.client;
@@ -783,7 +780,6 @@ public interface LocationServiceClient {
     @DeleteMapping("/api/v1/locations/drivers/{driverId}")
     void removeDriverLocation(@PathVariable("driverId") String driverId);
 }
-
 FILE: driverService\src\main\java\com\flashCab\driverService\controller\DriverController.java
 ========================================================================
 package com.flashCab.driverService.controller;
@@ -839,7 +835,6 @@ public class DriverController {
         return ResponseEntity.noContent().build();
     }
 }
-
 FILE: driverService\src\main\java\com\flashCab\driverService\controller\GlobalExceptionHandler.java
 ========================================================================
 package com.flashCab.driverService.controller;
@@ -874,7 +869,6 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(ex.getStatusCode()).body(errors);
     }
 }
-
 FILE: driverService\src\main\java\com\flashCab\driverService\DriverServiceApplication.java
 ========================================================================
 package com.flashCab.driverService;
@@ -892,7 +886,6 @@ public class DriverServiceApplication {
 	}
 
 }
-
 FILE: driverService\src\main\java\com\flashCab\driverService\dto\DriverBatchRequest.java
 ========================================================================
 package com.flashCab.driverService.dto;
@@ -909,7 +902,6 @@ import java.util.List;
 public class DriverBatchRequest {
     private List<String> driverIds;
 }
-
 FILE: driverService\src\main\java\com\flashCab\driverService\dto\DriverRequest.java
 ========================================================================
 package com.flashCab.driverService.dto;
@@ -939,7 +931,6 @@ public class DriverRequest {
     @NotBlank(message = "Vehicle number is required")
     private String vehicleNumber;
 }
-
 FILE: driverService\src\main\java\com\flashCab\driverService\dto\DriverResponse.java
 ========================================================================
 package com.flashCab.driverService.dto;
@@ -970,7 +961,6 @@ public class DriverResponse {
 
     private LocalDateTime createdAt;
 }
-
 FILE: driverService\src\main\java\com\flashCab\driverService\model\Driver.java
 ========================================================================
 package com.flashCab.driverService.model;
@@ -1004,7 +994,6 @@ public class Driver {
 
     private LocalDateTime createdAt;
 }
-
 FILE: driverService\src\main\java\com\flashCab\driverService\model\VehicleType.java
 ========================================================================
 package com.flashCab.driverService.model;
@@ -1016,7 +1005,6 @@ public enum VehicleType {
     PREMIUM,
     BIKE
 }
-
 FILE: driverService\src\main\java\com\flashCab\driverService\repository\DriverRepository.java
 ========================================================================
 package com.flashCab.driverService.repository;
@@ -1026,7 +1014,6 @@ import org.springframework.data.mongodb.repository.MongoRepository;
 
 public interface DriverRepository extends MongoRepository<Driver, String> {
 }
-
 FILE: driverService\src\main\java\com\flashCab\driverService\service\DriverService.java
 ========================================================================
 package com.flashCab.driverService.service;
@@ -1138,7 +1125,6 @@ public class DriverService {
         return driverId;
     }
 }
-
 FILE: driverService\src\main\resources\application.yaml
 ========================================================================
 spring:
@@ -1159,7 +1145,6 @@ management:
     web:
       exposure:
         include: health, info
-
 FILE: driverService\src\test\java\com\flashCab\driverService\DriverServiceApplicationTests.java
 ========================================================================
 package com.flashCab.driverService;
@@ -1175,7 +1160,6 @@ class DriverServiceApplicationTests {
 	}
 
 }
-
 FILE: FlashCabPostmanCollection.json
 ========================================================================
 {
@@ -1399,6 +1383,7 @@ FILE: FlashCabPostmanCollection.json
                   "pm.test('Status is 201 Created', function () { pm.response.to.have.status(201); });",
                   "pm.test('Response is JSON', function () { pm.response.to.be.json; });",
                   "const responseBody = pm.response.json();",
+                  "pm.test('Estimated fare is returned', function () { pm.expect(responseBody.estimatedFare).to.be.a('number'); });",
                   "const createdRideId = responseBody.rideId || responseBody.id;",
                   "pm.test('Generated ride ID is returned', function () { pm.expect(createdRideId).to.be.a('string').and.not.empty; });",
                   "if (createdRideId !== undefined && createdRideId !== null) {",
@@ -1934,7 +1919,10 @@ FILE: FlashCabPostmanCollection.json
     }
   ]
 }
-
+FILE: locationService\.gitattributes
+========================================================================
+/mvnw text eol=lf
+*.cmd text eol=crlf
 FILE: locationService\.gitignore
 ========================================================================
 HELP.md
@@ -1970,13 +1958,11 @@ build/
 
 ### VS Code ###
 .vscode/
-
 FILE: locationService\.mvn\wrapper\maven-wrapper.properties
 ========================================================================
 wrapperVersion=3.3.4
 distributionType=only-script
 distributionUrl=https://repo.maven.apache.org/maven2/org/apache/maven/apache-maven/3.10.0/apache-maven-3.10.0-bin.zip
-
 FILE: locationService\HELP.md
 ========================================================================
 # Getting Started
@@ -2006,7 +1992,6 @@ Due to Maven's design, elements are inherited from the parent POM to the project
 While most of the inheritance is fine, it also inherits unwanted elements like `<license>` and `<developers>` from the parent.
 To prevent this, the project POM contains empty overrides for these elements.
 If you manually switch to a different parent and actually want the inheritance, you need to remove those overrides.
-
 FILE: locationService\mvnw
 ========================================================================
 #!/bin/sh
@@ -2304,7 +2289,6 @@ mv -- "$TMP_DOWNLOAD_DIR/$actualDistributionDir" "$MAVEN_HOME" || [ -d "$MAVEN_H
 
 clean || :
 exec_maven "$@"
-
 FILE: locationService\mvnw.cmd
 ========================================================================
 <# : batch portion
@@ -2496,7 +2480,6 @@ try {
 }
 
 Write-Output "MVN_CMD=$MAVEN_HOME/bin/$MVN_CMD"
-
 FILE: locationService\pom.xml
 ========================================================================
 <?xml version="1.0" encoding="UTF-8"?>
@@ -2629,7 +2612,6 @@ FILE: locationService\pom.xml
 	</build>
 
 </project>
-
 FILE: locationService\src\main\java\com\flashCab\driverService\dto\DriverResponse.java
 ========================================================================
 package com.flashCab.driverService.dto;
@@ -2653,7 +2635,6 @@ public class DriverResponse {
     private String vehicleNumber;
     private LocalDateTime createdAt;
 }
-
 FILE: locationService\src\main\java\com\flashCab\driverService\model\VehicleType.java
 ========================================================================
 package com.flashCab.driverService.model;
@@ -2665,7 +2646,6 @@ public enum VehicleType {
     PREMIUM,
     BIKE
 }
-
 FILE: locationService\src\main\java\com\flashCab\locationService\client\DriverServiceClient.java
 ========================================================================
 package com.flashCab.locationService.client;
@@ -2686,7 +2666,6 @@ public interface DriverServiceClient {
     @GetMapping("/api/v1/drivers")
     List<DriverResponse> getDrivers();
 }
-
 FILE: locationService\src\main\java\com\flashCab\locationService\config\RedisConfig.java
 ========================================================================
 package com.flashCab.locationService.config;
@@ -2712,7 +2691,6 @@ public class RedisConfig {
     }
 
 }
-
 FILE: locationService\src\main\java\com\flashCab\locationService\controller\LocationController.java
 ========================================================================
 package com.flashCab.locationService.controller;
@@ -2758,7 +2736,6 @@ public class LocationController {
 
     }
 }
-
 FILE: locationService\src\main\java\com\flashCab\locationService\dto\DriverLocationRequest.java
 ========================================================================
 package com.flashCab.locationService.dto;
@@ -2775,7 +2752,6 @@ public class DriverLocationRequest {
     private Double latitude;
     private Double longitude;
 }
-
 FILE: locationService\src\main\java\com\flashCab\locationService\dto\NearByDriverResponse.java
 ========================================================================
 package com.flashCab.locationService.dto;
@@ -2793,7 +2769,6 @@ public class NearByDriverResponse {
     private Double longitude;
     private Double distanceInKm;
 }
-
 FILE: locationService\src\main\java\com\flashCab\locationService\LocationServiceApplication.java
 ========================================================================
 package com.flashCab.locationService;
@@ -2811,7 +2786,6 @@ public class LocationServiceApplication {
 	}
 
 }
-
 FILE: locationService\src\main\java\com\flashCab\locationService\service\LocationService.java
 ========================================================================
 package com.flashCab.locationService.service;
@@ -2935,7 +2909,6 @@ public class LocationService {
     }
 
 }
-
 FILE: locationService\src\main\resources\application.properties
 ========================================================================
 spring.application.name=locationService
@@ -2947,7 +2920,6 @@ spring.data.redis.port=6379
 driver.service.url=http://localhost:8085
 # Actuator
 management.endpoints.web.exposure.include=health, info
-
 FILE: locationService\src\test\java\com\flashCab\locationService\LocationServiceApplicationTests.java
 ========================================================================
 package com.flashCab.locationService;
@@ -2963,7 +2935,10 @@ class LocationServiceApplicationTests {
 	}
 
 }
-
+FILE: matchingService\.gitattributes
+========================================================================
+/mvnw text eol=lf
+*.cmd text eol=crlf
 FILE: matchingService\.gitignore
 ========================================================================
 HELP.md
@@ -2999,13 +2974,11 @@ build/
 
 ### VS Code ###
 .vscode/
-
 FILE: matchingService\.mvn\wrapper\maven-wrapper.properties
 ========================================================================
 wrapperVersion=3.3.4
 distributionType=only-script
 distributionUrl=https://repo.maven.apache.org/maven2/org/apache/maven/apache-maven/3.10.0/apache-maven-3.10.0-bin.zip
-
 FILE: matchingService\HELP.md
 ========================================================================
 # Getting Started
@@ -3034,7 +3007,6 @@ Due to Maven's design, elements are inherited from the parent POM to the project
 While most of the inheritance is fine, it also inherits unwanted elements like `<license>` and `<developers>` from the parent.
 To prevent this, the project POM contains empty overrides for these elements.
 If you manually switch to a different parent and actually want the inheritance, you need to remove those overrides.
-
 FILE: matchingService\mvnw
 ========================================================================
 #!/bin/sh
@@ -3332,7 +3304,6 @@ mv -- "$TMP_DOWNLOAD_DIR/$actualDistributionDir" "$MAVEN_HOME" || [ -d "$MAVEN_H
 
 clean || :
 exec_maven "$@"
-
 FILE: matchingService\mvnw.cmd
 ========================================================================
 <# : batch portion
@@ -3524,7 +3495,6 @@ try {
 }
 
 Write-Output "MVN_CMD=$MAVEN_HOME/bin/$MVN_CMD"
-
 FILE: matchingService\pom.xml
 ========================================================================
 <?xml version="1.0" encoding="UTF-8"?>
@@ -3658,7 +3628,6 @@ FILE: matchingService\pom.xml
     </build>
 
 </project>
-
 FILE: matchingService\src\main\java\com\flashCab\matchingService\client\DriverServiceClient.java
 ========================================================================
 package com.flashCab.matchingService.client;
@@ -3676,7 +3645,6 @@ public interface DriverServiceClient {
     @GetMapping("/api/v1/drivers/batch")
     List<DriverProfileResponse> getDriversByIds(@RequestParam("ids") List<String> ids);
 }
-
 FILE: matchingService\src\main\java\com\flashCab\matchingService\client\LocationServiceClient.java
 ========================================================================
 package com.flashCab.matchingService.client;
@@ -3695,7 +3663,6 @@ public interface LocationServiceClient {
                                                 @RequestParam double longitude,
                                                 @RequestParam double radiusInKm);
 }
-
 FILE: matchingService\src\main\java\com\flashCab\matchingService\dto\DriverProfileResponse.java
 ========================================================================
 package com.flashCab.matchingService.dto;
@@ -3715,7 +3682,6 @@ public class DriverProfileResponse {
     private String vehicleType;
     private String vehicleNumber;
 }
-
 FILE: matchingService\src\main\java\com\flashCab\matchingService\dto\NearByDriverResponse.java
 ========================================================================
 package com.flashCab.matchingService.dto;
@@ -3735,7 +3701,6 @@ public class NearByDriverResponse {
     private Double distanceInKm;
 
 }
-
 FILE: matchingService\src\main\java\com\flashCab\matchingService\event\RideMatchedEvent.java
 ========================================================================
 package com.flashCab.matchingService.event;
@@ -3764,7 +3729,6 @@ public class RideMatchedEvent {
     private String vehicleType;
 
 }
-
 FILE: matchingService\src\main\java\com\flashCab\matchingService\event\RideRequestedEvent.java
 ========================================================================
 package com.flashCab.matchingService.event;
@@ -3796,7 +3760,6 @@ public class RideRequestedEvent {
 
     private String vehicleType;
 }
-
 FILE: matchingService\src\main\java\com\flashCab\matchingService\MatchingServiceApplication.java
 ========================================================================
 package com.flashCab.matchingService;
@@ -3814,7 +3777,6 @@ public class MatchingServiceApplication {
     }
 
 }
-
 FILE: matchingService\src\main\java\com\flashCab\matchingService\service\MatchingService.java
 ========================================================================
 package com.flashCab.matchingService.service;
@@ -3943,7 +3905,6 @@ public class MatchingService {
     }
 
 }
-
 FILE: matchingService\src\main\java\com\flashCab\matchingService\service\RideEventConsumer.java
 ========================================================================
 package com.flashCab.matchingService.service;
@@ -3971,7 +3932,6 @@ public class RideEventConsumer {
     }
 
 }
-
 FILE: matchingService\src\main\resources\application.yaml
 ========================================================================
 spring:
@@ -4011,7 +3971,6 @@ management:
 
 server:
   port: 8084
-
 FILE: matchingService\src\test\java\com\flashCab\matchingService\MatchingServiceApplicationTests.java
 ========================================================================
 package com.flashCab.matchingService;
@@ -4027,7 +3986,10 @@ class MatchingServiceApplicationTests {
 	}
 
 }
-
+FILE: riderService\.gitattributes
+========================================================================
+/mvnw text eol=lf
+*.cmd text eol=crlf
 FILE: riderService\.gitignore
 ========================================================================
 HELP.md
@@ -4063,13 +4025,11 @@ build/
 
 ### VS Code ###
 .vscode/
-
 FILE: riderService\.mvn\wrapper\maven-wrapper.properties
 ========================================================================
 wrapperVersion=3.3.4
 distributionType=only-script
 distributionUrl=https://repo.maven.apache.org/maven2/org/apache/maven/apache-maven/3.10.0/apache-maven-3.10.0-bin.zip
-
 FILE: riderService\HELP.md
 ========================================================================
 # Getting Started
@@ -4099,7 +4059,6 @@ Due to Maven's design, elements are inherited from the parent POM to the project
 While most of the inheritance is fine, it also inherits unwanted elements like `<license>` and `<developers>` from the parent.
 To prevent this, the project POM contains empty overrides for these elements.
 If you manually switch to a different parent and actually want the inheritance, you need to remove those overrides.
-
 FILE: riderService\mvnw
 ========================================================================
 #!/bin/sh
@@ -4397,7 +4356,6 @@ mv -- "$TMP_DOWNLOAD_DIR/$actualDistributionDir" "$MAVEN_HOME" || [ -d "$MAVEN_H
 
 clean || :
 exec_maven "$@"
-
 FILE: riderService\mvnw.cmd
 ========================================================================
 <# : batch portion
@@ -4589,7 +4547,6 @@ try {
 }
 
 Write-Output "MVN_CMD=$MAVEN_HOME/bin/$MVN_CMD"
-
 FILE: riderService\pom.xml
 ========================================================================
 <?xml version="1.0" encoding="UTF-8"?>
@@ -4714,7 +4671,6 @@ FILE: riderService\pom.xml
 	</build>
 
 </project>
-
 FILE: riderService\src\main\java\com\flashCab\riderService\controller\RiderController.java
 ========================================================================
 package com.flashCab.riderService.controller;
@@ -4765,7 +4721,6 @@ public class RiderController {
         return ResponseEntity.noContent().build();
     }
 }
-
 FILE: riderService\src\main\java\com\flashCab\riderService\dto\RiderRequest.java
 ========================================================================
 package com.flashCab.riderService.dto;
@@ -4787,7 +4742,6 @@ public class RiderRequest {
     @NotBlank(message = "Phone is required")
     private String phone;
 }
-
 FILE: riderService\src\main\java\com\flashCab\riderService\dto\RiderResponse.java
 ========================================================================
 package com.flashCab.riderService.dto;
@@ -4815,7 +4769,6 @@ public class RiderResponse {
 
     private LocalDateTime updatedAt;
 }
-
 FILE: riderService\src\main\java\com\flashCab\riderService\exception\GlobalExceptionHandler.java
 ========================================================================
 package com.flashCab.riderService.exception;
@@ -4850,7 +4803,6 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(ex.getStatusCode()).body(errors);
     }
 }
-
 FILE: riderService\src\main\java\com\flashCab\riderService\model\Rider.java
 ========================================================================
 package com.flashCab.riderService.model;
@@ -4882,7 +4834,6 @@ public class Rider {
 
     private LocalDateTime updatedAt;
 }
-
 FILE: riderService\src\main\java\com\flashCab\riderService\repository\RiderRepository.java
 ========================================================================
 package com.flashCab.riderService.repository;
@@ -4892,7 +4843,6 @@ import org.springframework.data.mongodb.repository.MongoRepository;
 
 public interface RiderRepository extends MongoRepository<Rider, String> {
 }
-
 FILE: riderService\src\main\java\com\flashCab\riderService\RiderServiceApplication.java
 ========================================================================
 package com.flashCab.riderService;
@@ -4908,7 +4858,6 @@ public class RiderServiceApplication {
 	}
 
 }
-
 FILE: riderService\src\main\java\com\flashCab\riderService\service\RiderService.java
 ========================================================================
 package com.flashCab.riderService.service;
@@ -4984,7 +4933,6 @@ public class RiderService {
         );
     }
 }
-
 FILE: riderService\src\main\resources\application.yaml
 ========================================================================
 spring:
@@ -5001,7 +4949,6 @@ management:
     web:
       exposure:
         include: health, info
-
 FILE: riderService\src\test\java\com\flashCab\riderService\RiderServiceApplicationTests.java
 ========================================================================
 package com.flashCab.riderService;
@@ -5017,7 +4964,10 @@ class RiderServiceApplicationTests {
 	}
 
 }
-
+FILE: rideService\.gitattributes
+========================================================================
+/mvnw text eol=lf
+*.cmd text eol=crlf
 FILE: rideService\.gitignore
 ========================================================================
 HELP.md
@@ -5053,13 +5003,11 @@ build/
 
 ### VS Code ###
 .vscode/
-
 FILE: rideService\.mvn\wrapper\maven-wrapper.properties
 ========================================================================
 wrapperVersion=3.3.4
 distributionType=only-script
 distributionUrl=https://repo.maven.apache.org/maven2/org/apache/maven/apache-maven/3.10.0/apache-maven-3.10.0-bin.zip
-
 FILE: rideService\HELP.md
 ========================================================================
 # Getting Started
@@ -5093,7 +5041,6 @@ Due to Maven's design, elements are inherited from the parent POM to the project
 While most of the inheritance is fine, it also inherits unwanted elements like `<license>` and `<developers>` from the parent.
 To prevent this, the project POM contains empty overrides for these elements.
 If you manually switch to a different parent and actually want the inheritance, you need to remove those overrides.
-
 FILE: rideService\mvnw
 ========================================================================
 #!/bin/sh
@@ -5391,7 +5338,6 @@ mv -- "$TMP_DOWNLOAD_DIR/$actualDistributionDir" "$MAVEN_HOME" || [ -d "$MAVEN_H
 
 clean || :
 exec_maven "$@"
-
 FILE: rideService\mvnw.cmd
 ========================================================================
 <# : batch portion
@@ -5583,7 +5529,6 @@ try {
 }
 
 Write-Output "MVN_CMD=$MAVEN_HOME/bin/$MVN_CMD"
-
 FILE: rideService\pom.xml
 ========================================================================
 <?xml version="1.0" encoding="UTF-8"?>
@@ -5739,7 +5684,6 @@ FILE: rideService\pom.xml
 	</build>
 
 </project>
-
 FILE: rideService\src\main\java\com\flashCab\driverService\dto\DriverResponse.java
 ========================================================================
 package com.flashCab.driverService.dto;
@@ -5763,7 +5707,6 @@ public class DriverResponse {
     private String vehicleNumber;
     private LocalDateTime createdAt;
 }
-
 FILE: rideService\src\main\java\com\flashCab\driverService\model\VehicleType.java
 ========================================================================
 package com.flashCab.driverService.model;
@@ -5775,7 +5718,6 @@ public enum VehicleType {
     PREMIUM,
     BIKE
 }
-
 FILE: rideService\src\main\java\com\flashCab\riderService\dto\RiderResponse.java
 ========================================================================
 package com.flashCab.riderService.dto;
@@ -5797,7 +5739,6 @@ public class RiderResponse {
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }
-
 FILE: rideService\src\main\java\com\flashCab\rideService\client\DriverServiceClient.java
 ========================================================================
 package com.flashCab.rideService.client;
@@ -5813,7 +5754,49 @@ public interface DriverServiceClient {
     @GetMapping("/api/v1/drivers/{driverId}")
     DriverResponse getDriverById(@PathVariable("driverId") String driverId);
 }
+FILE: rideService\src\main\java\com\flashCab\rideService\client\OpenMeteoWeatherClient.java
+========================================================================
+package com.flashCab.rideService.client;
 
+import com.flashCab.rideService.dto.OpenMeteoWeatherResponse;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
+import org.springframework.stereotype.Component;
+import org.springframework.web.client.RestClient;
+
+import java.time.Duration;
+
+@Component
+public class OpenMeteoWeatherClient {
+
+    private static final String OPEN_METEO_URL = "https://api.open-meteo.com";
+    private final RestClient restClient;
+
+    public OpenMeteoWeatherClient() {
+        SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
+        requestFactory.setConnectTimeout(Duration.ofSeconds(2));
+        requestFactory.setReadTimeout(Duration.ofSeconds(3));
+        this.restClient = RestClient.builder()
+                .baseUrl(OPEN_METEO_URL)
+                .requestFactory(requestFactory)
+                .build();
+    }
+
+    public OpenMeteoWeatherResponse getCurrentWeather(double latitude, double longitude) {
+        return restClient.get()
+                .uri(uriBuilder -> uriBuilder
+                        .path("/v1/forecast")
+                        .queryParam("latitude", latitude)
+                        .queryParam("longitude", longitude)
+                        .queryParam(
+                                "current",
+                                "temperature_2m,precipitation,rain,showers,weather_code,wind_speed_10m"
+                        )
+                        .queryParam("timezone", "auto")
+                        .build())
+                .retrieve()
+                .body(OpenMeteoWeatherResponse.class);
+    }
+}
 FILE: rideService\src\main\java\com\flashCab\rideService\client\RiderServiceClient.java
 ========================================================================
 package com.flashCab.rideService.client;
@@ -5829,7 +5812,6 @@ public interface RiderServiceClient {
     @GetMapping("/api/v1/riders/{riderId}")
     RiderResponse getRiderById(@PathVariable("riderId") String riderId);
 }
-
 FILE: rideService\src\main\java\com\flashCab\rideService\config\KafkaConfig.java
 ========================================================================
 package com.flashCab.rideService.config;
@@ -5854,7 +5836,6 @@ public class KafkaConfig {
     }
 
 }
-
 FILE: rideService\src\main\java\com\flashCab\rideService\controller\GlobalExceptionHandler.java
 ========================================================================
 package com.flashCab.rideService.controller;
@@ -5889,7 +5870,6 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errors);
     }
 }
-
 FILE: rideService\src\main\java\com\flashCab\rideService\controller\RideController.java
 ========================================================================
 package com.flashCab.rideService.controller;
@@ -5945,7 +5925,39 @@ public class RideController {
         return ResponseEntity.ok(rideService.cancelRide(rideId));
     }
 }
+FILE: rideService\src\main\java\com\flashCab\rideService\dto\OpenMeteoWeatherResponse.java
+========================================================================
+package com.flashCab.rideService.dto;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+@Data
+@NoArgsConstructor
+public class OpenMeteoWeatherResponse {
+
+    private Current current;
+
+    @Data
+    @NoArgsConstructor
+    public static class Current {
+        @JsonProperty("temperature_2m")
+        private Double temperature2m;
+
+        private Double precipitation;
+
+        private Double rain;
+
+        private Double showers;
+
+        @JsonProperty("weather_code")
+        private Integer weatherCode;
+
+        @JsonProperty("wind_speed_10m")
+        private Double windSpeed10m;
+    }
+}
 FILE: rideService\src\main\java\com\flashCab\rideService\dto\RideRequest.java
 ========================================================================
 package com.flashCab.rideService.dto;
@@ -5986,7 +5998,6 @@ public class RideRequest {
     @NotNull(message = "Vehicle type is required")
     private VehicleType vehicleType;
 }
-
 FILE: rideService\src\main\java\com\flashCab\rideService\dto\RideResponse.java
 ========================================================================
 package com.flashCab.rideService.dto;
@@ -6035,7 +6046,6 @@ public class RideResponse {
 
     private LocalDateTime completedAt;
 }
-
 FILE: rideService\src\main\java\com\flashCab\rideService\event\RideMatchedEvent.java
 ========================================================================
 package com.flashCab.rideService.event;
@@ -6065,7 +6075,6 @@ public class RideMatchedEvent {
     private VehicleType vehicleType;
 
 }
-
 FILE: rideService\src\main\java\com\flashCab\rideService\event\RideRequestedEvent.java
 ========================================================================
 package com.flashCab.rideService.event;
@@ -6097,7 +6106,6 @@ public class RideRequestedEvent {
 
     private VehicleType vehicleType;
 }
-
 FILE: rideService\src\main\java\com\flashCab\rideService\model\Ride.java
 ========================================================================
 package com.flashCab.rideService.model;
@@ -6169,7 +6177,6 @@ public class Ride {
     private LocalDateTime completedAt;
 
 }
-
 FILE: rideService\src\main\java\com\flashCab\rideService\model\RideStatus.java
 ========================================================================
 package com.flashCab.rideService.model;
@@ -6183,7 +6190,6 @@ public enum RideStatus {
     COMPLETED,
     CANCELLED
 }
-
 FILE: rideService\src\main\java\com\flashCab\rideService\model\VehicleType.java
 ========================================================================
 package com.flashCab.rideService.model;
@@ -6195,7 +6201,6 @@ public enum VehicleType {
     PREMIUM,
     BIKE
 }
-
 FILE: rideService\src\main\java\com\flashCab\rideService\repository\RideRepository.java
 ========================================================================
 package com.flashCab.rideService.repository;
@@ -6208,7 +6213,6 @@ import java.util.List;
 public interface RideRepository extends JpaRepository<Ride, String> {
     List<Ride> findByRiderIdOrderByCreatedAtDesc(String riderId);
 }
-
 FILE: rideService\src\main\java\com\flashCab\rideService\RideServiceApplication.java
 ========================================================================
 package com.flashCab.rideService;
@@ -6226,7 +6230,6 @@ public class RideServiceApplication {
 	}
 
 }
-
 FILE: rideService\src\main\java\com\flashCab\rideService\service\RideEventConsumer.java
 ========================================================================
 package com.flashCab.rideService.service;
@@ -6251,13 +6254,14 @@ public class RideEventConsumer {
     }
 
 }
-
 FILE: rideService\src\main\java\com\flashCab\rideService\service\RideService.java
 ========================================================================
 package com.flashCab.rideService.service;
 
 import com.flashCab.rideService.client.DriverServiceClient;
+import com.flashCab.rideService.client.OpenMeteoWeatherClient;
 import com.flashCab.rideService.client.RiderServiceClient;
+import com.flashCab.rideService.dto.OpenMeteoWeatherResponse;
 import com.flashCab.rideService.dto.RideRequest;
 import com.flashCab.rideService.dto.RideResponse;
 import com.flashCab.rideService.event.RideRequestedEvent;
@@ -6271,9 +6275,12 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestClientException;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -6283,14 +6290,17 @@ import java.util.stream.Collectors;
 public class RideService {
 
     private static final String RIDE_REQUESTED_TOPIC = "ride.requested";
+    private static final ZoneId BOOKING_TIME_ZONE = ZoneId.of("Asia/Kolkata");
     private final RideRepository rideRepository;
     private final KafkaTemplate<String, RideRequestedEvent> kafkaTemplate;
     private final RiderServiceClient riderServiceClient;
     private final DriverServiceClient driverServiceClient;
     private final VehicleFarePolicy vehicleFarePolicy;
+    private final OpenMeteoWeatherClient openMeteoWeatherClient;
 
     public RideResponse requestRide(RideRequest request) {
         log.info("New ride request from rider: {}", request.getRiderId());
+        LocalTime bookingTime = LocalTime.now(BOOKING_TIME_ZONE);
         validateRiderExists(request.getRiderId());
 
         Ride ride = new Ride();
@@ -6303,7 +6313,7 @@ public class RideService {
         ride.setDropLongitude(request.getDropLongitude());
         ride.setDropAddress(request.getDropAddress());
         ride.setStatus(RideStatus.REQUESTED);
-        ride.setEstimatedFare(calculateEstimateFare(request));
+        ride.setEstimatedFare(calculateEstimateFare(request, bookingTime));
 
         Ride savedRide = rideRepository.save(ride);
 
@@ -6316,8 +6326,7 @@ public class RideService {
                 savedRide.getDropLatitude(),
                 savedRide.getDropLongitude(),
                 savedRide.getDropAddress(),
-                savedRide.getVehicleType()
-        );
+                savedRide.getVehicleType());
 
         kafkaTemplate.send(RIDE_REQUESTED_TOPIC, savedRide.getId(), event);
         log.info("Ride requested event published to Kafka for ride: {}", savedRide.getId());
@@ -6346,7 +6355,8 @@ public class RideService {
         }
 
         if (driver == null || driver.getVehicleType() == null) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Matched driver is invalid or missing vehicle type");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Matched driver is invalid or missing vehicle type");
         }
 
         if (ride.getVehicleType() != null && !driver.getVehicleType().name().equals(ride.getVehicleType().name())) {
@@ -6356,15 +6366,16 @@ public class RideService {
 
         ride.setDriverId(driverId);
         ride.setStatus(RideStatus.ACCEPTED);
-        ride.setActualFare(calculateFareForVehicle(driver.getVehicleType(), ride.getPickupLatitude(), ride.getPickupLongitude(), ride.getDropLatitude(), ride.getDropLongitude()));
-        ride.setEstimatedFare(calculateEstimateFare(ride.getVehicleType(), ride.getPickupLatitude(), ride.getPickupLongitude(), ride.getDropLatitude(), ride.getDropLongitude()));
+        ride.setActualFare(ride.getEstimatedFare());
         rideRepository.save(ride);
     }
 
     public RideResponse startRide(String rideId) {
-        Ride ride = rideRepository.findById(rideId).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Ride not found"));
+        Ride ride = rideRepository.findById(rideId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Ride not found"));
         if (ride.getStatus() != RideStatus.ACCEPTED) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Ride cannot be started, Current status: " + ride.getStatus());
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Ride cannot be started, Current status: " + ride.getStatus());
         }
         ride.setStatus(RideStatus.RIDE_STARTED);
         ride.setStartedAt(LocalDateTime.now());
@@ -6373,9 +6384,11 @@ public class RideService {
     }
 
     public RideResponse completeRide(String rideId) {
-        Ride ride = rideRepository.findById(rideId).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Ride not found"));
+        Ride ride = rideRepository.findById(rideId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Ride not found"));
         if (ride.getStatus() != RideStatus.RIDE_STARTED) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Ride cannot be completed, Current status: " + ride.getStatus());
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Ride cannot be completed, Current status: " + ride.getStatus());
         }
         ride.setStatus(RideStatus.COMPLETED);
         ride.setCompletedAt(LocalDateTime.now());
@@ -6385,9 +6398,11 @@ public class RideService {
     }
 
     public RideResponse cancelRide(String rideId) {
-        Ride ride = rideRepository.findById(rideId).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Ride not found"));
+        Ride ride = rideRepository.findById(rideId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Ride not found"));
         if (ride.getStatus() == RideStatus.COMPLETED || ride.getStatus() == RideStatus.CANCELLED) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Ride cannot be cancelled from current status: " + ride.getStatus());
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Ride cannot be cancelled from current status: " + ride.getStatus());
         }
         ride.setStatus(RideStatus.CANCELLED);
         rideRepository.save(ride);
@@ -6395,7 +6410,8 @@ public class RideService {
     }
 
     public RideResponse getRideById(String rideId) {
-        Ride ride = rideRepository.findById(rideId).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Ride not found"));
+        Ride ride = rideRepository.findById(rideId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Ride not found"));
         return mapToResponse(ride);
     }
 
@@ -6417,11 +6433,22 @@ public class RideService {
         }
     }
 
-    private Double calculateEstimateFare(RideRequest request) {
-        return calculateEstimateFare(request.getVehicleType(), request.getPickupLatitude(), request.getPickupLongitude(), request.getDropLatitude(), request.getDropLongitude());
+    private Double calculateEstimateFare(RideRequest request, LocalTime bookingTime) {
+        double distanceKm = calculateDistanceKm(
+                request.getPickupLatitude(),
+                request.getPickupLongitude(),
+                request.getDropLatitude(),
+                request.getDropLongitude());
+        double baseFare = calculateBaseFare(request.getVehicleType(), distanceKm);
+        double timeMultiplier = calculateTimeMultiplier(bookingTime);
+        double weatherMultiplier = calculateWeatherMultiplier(
+                request.getPickupLatitude(),
+                request.getPickupLongitude());
+        return roundFare(baseFare * timeMultiplier * weatherMultiplier);
     }
 
-    private Double calculateEstimateFare(VehicleType vehicleType, double pickupLatitude, double pickupLongitude, double dropLatitude, double dropLongitude) {
+    private double calculateDistanceKm(double pickupLatitude, double pickupLongitude, double dropLatitude,
+            double dropLongitude) {
         double lat1 = Math.toRadians(pickupLatitude);
         double lat2 = Math.toRadians(dropLatitude);
         double lon1 = Math.toRadians(pickupLongitude);
@@ -6429,19 +6456,101 @@ public class RideService {
         double latDiff = lat2 - lat1;
         double lonDiff = lon1 - lon2;
 
-        double a = Math.pow(Math.sin(latDiff / 2), 2) + Math.cos(lat1) * Math.cos(lat2) * Math.pow(Math.sin(lonDiff / 2), 2);
+        double a = Math.pow(Math.sin(latDiff / 2), 2)
+                + Math.cos(lat1) * Math.cos(lat2) * Math.pow(Math.sin(lonDiff / 2), 2);
         double c = 2 * Math.asin(Math.sqrt(a));
-        double distanceKm = 6371 * c;
-        double fare = vehicleFarePolicy.getBaseFare(vehicleType) + (distanceKm * vehicleFarePolicy.getPerKmRate(vehicleType));
+        return 6371 * c;
+    }
+
+    private double calculateBaseFare(VehicleType vehicleType, double distanceKm) {
+        return vehicleFarePolicy.getBaseFare(vehicleType)
+                + (distanceKm * vehicleFarePolicy.getPerKmRate(vehicleType));
+    }
+
+    private double calculateTimeMultiplier(LocalTime bookingTime) {
+        if (isInTimeRange(bookingTime, LocalTime.of(5, 0), LocalTime.of(8, 0))
+                || isInTimeRange(bookingTime, LocalTime.of(11, 0), LocalTime.of(17, 0))) {
+            return 1.0;
+        }
+        if (isInTimeRange(bookingTime, LocalTime.of(8, 0), LocalTime.of(11, 0))
+                || isInTimeRange(bookingTime, LocalTime.of(17, 0), LocalTime.of(22, 0))) {
+            return 1.20;
+        }
+        return 1.15;
+    }
+
+    private boolean isInTimeRange(LocalTime time, LocalTime startInclusive, LocalTime endExclusive) {
+        return !time.isBefore(startInclusive) && time.isBefore(endExclusive);
+    }
+
+    private double calculateWeatherMultiplier(double pickupLatitude, double pickupLongitude) {
+        try {
+            OpenMeteoWeatherResponse response = openMeteoWeatherClient.getCurrentWeather(
+                    pickupLatitude,
+                    pickupLongitude);
+            if (response == null || response.getCurrent() == null) {
+                throw new IllegalStateException("Open-Meteo response is missing current weather data");
+            }
+
+            OpenMeteoWeatherResponse.Current current = response.getCurrent();
+            if (current.getWeatherCode() == null
+                    || current.getPrecipitation() == null
+                    || current.getRain() == null
+                    || !Double.isFinite(current.getPrecipitation())
+                    || !Double.isFinite(current.getRain())
+                    || current.getPrecipitation() < 0
+                    || current.getRain() < 0) {
+                throw new IllegalStateException("Open-Meteo response contains invalid weather data");
+            }
+
+            return classifyWeatherMultiplier(
+                    current.getWeatherCode(),
+                    current.getPrecipitation(),
+                    current.getRain());
+        } catch (RestClientException | IllegalArgumentException | IllegalStateException exception) {
+            log.warn(
+                    "Unable to retrieve valid Open-Meteo weather for pickup ({}, {}); using neutral weather multiplier",
+                    pickupLatitude,
+                    pickupLongitude,
+                    exception);
+            return 1.0;
+        }
+    }
+
+    private double classifyWeatherMultiplier(int weatherCode, double precipitation, double rain) {
+        if (weatherCode == 95 || weatherCode == 96 || weatherCode == 99) {
+            return 1.30;
+        }
+        if (weatherCode == 56 || weatherCode == 57
+                || weatherCode == 66 || weatherCode == 67
+                || weatherCode == 71 || weatherCode == 73 || weatherCode == 75
+                || weatherCode == 77 || weatherCode == 85 || weatherCode == 86) {
+            return 1.25;
+        }
+
+        double precipitationMultiplier = calculatePrecipitationMultiplier(precipitation, rain);
+        return switch (weatherCode) {
+            case 0, 1, 2, 3, 45, 48 -> precipitationMultiplier;
+            case 51, 61, 80 -> Math.max(1.10, precipitationMultiplier);
+            case 53, 55, 63, 81 -> Math.max(1.15, precipitationMultiplier);
+            case 65, 82 -> 1.25;
+            default -> throw new IllegalArgumentException("Unrecognized Open-Meteo weather code: " + weatherCode);
+        };
+    }
+
+    private double calculatePrecipitationMultiplier(double precipitation, double rain) {
+        double amount = Math.max(precipitation, rain);
+        if (amount >= 7.6) {
+            return 1.25;
+        }
+        if (amount >= 2.5) {
+            return 1.15;
+        }
+        return amount > 0 ? 1.10 : 1.0;
+    }
+
+    private double roundFare(double fare) {
         return Math.round(fare * 100.0) / 100.0;
-    }
-
-    private double calculateFareForVehicle(com.flashCab.driverService.dto.DriverResponse driverResponse, double pickupLatitude, double pickupLongitude, double dropLatitude, double dropLongitude) {
-        return calculateFareForVehicle(driverResponse.getVehicleType(), pickupLatitude, pickupLongitude, dropLatitude, dropLongitude);
-    }
-
-    private double calculateFareForVehicle(com.flashCab.driverService.model.VehicleType vehicleType, double pickupLatitude, double pickupLongitude, double dropLatitude, double dropLongitude) {
-        return calculateEstimateFare(com.flashCab.rideService.model.VehicleType.valueOf(vehicleType.name()), pickupLatitude, pickupLongitude, dropLatitude, dropLongitude);
     }
 
     private RideResponse mapToResponse(Ride savedRide) {
@@ -6472,7 +6581,6 @@ public class RideService {
         return response;
     }
 }
-
 FILE: rideService\src\main\java\com\flashCab\rideService\service\VehicleFarePolicy.java
 ========================================================================
 package com.flashCab.rideService.service;
@@ -6534,7 +6642,6 @@ public class VehicleFarePolicy {
         };
     }
 }
-
 FILE: rideService\src\main\resources\application.yaml
 ========================================================================
 spring:
@@ -6603,7 +6710,6 @@ management:
 
 server:
   port: 8083
-
 FILE: rideService\src\test\java\com\flashCab\rideService\RideServiceApplicationTests.java
 ========================================================================
 package com.flashCab.rideService;
@@ -6619,4 +6725,3 @@ class RideServiceApplicationTests {
 	}
 
 }
-
