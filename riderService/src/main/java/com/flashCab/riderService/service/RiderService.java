@@ -11,7 +11,6 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Service
@@ -23,7 +22,6 @@ public class RiderService {
     public RiderResponse registerRider(RiderRequest request) {
         LocalDateTime now = LocalDateTime.now();
         Rider rider = new Rider();
-        rider.setId(UUID.randomUUID().toString());
         applyRequest(rider, request);
         rider.setCreatedAt(now);
         rider.setUpdatedAt(now);

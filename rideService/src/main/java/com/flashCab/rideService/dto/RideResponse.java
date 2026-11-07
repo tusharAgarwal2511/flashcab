@@ -1,6 +1,7 @@
 package com.flashCab.rideService.dto;
 
 import com.flashCab.rideService.model.RideStatus;
+import com.flashCab.rideService.model.VehicleType;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -16,6 +17,8 @@ public class RideResponse {
     private String riderId;
 
     private String driverId;
+
+    private VehicleType vehicleType;
 
     private Double pickupLatitude;
 

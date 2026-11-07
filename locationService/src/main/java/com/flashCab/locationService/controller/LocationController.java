@@ -25,9 +25,8 @@ public class LocationController {
 
     @GetMapping("/drivers/seed")
     public ResponseEntity<String> seedDrivers(@RequestParam int count, @RequestParam double minLatitude, @RequestParam double maxLatitude, @RequestParam double minLongitude, @RequestParam double maxLongitude) {
-
-        locationService.seedDrivers(count, minLatitude, maxLatitude, minLongitude, maxLongitude);
-        return ResponseEntity.ok(count + " drivers added to Redis");
+        int added = locationService.seedDrivers(count, minLatitude, maxLatitude, minLongitude, maxLongitude);
+        return ResponseEntity.ok(added + " drivers added to Redis");
     }
 
     @GetMapping("/drivers/nearby")

@@ -24,4 +24,6 @@ public class RideRequestedEvent {
     private Double dropLongitude;
 
     private String dropAddress;
+
+    private String vehicleType;
 }

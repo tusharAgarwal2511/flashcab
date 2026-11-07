@@ -1,6 +1,6 @@
 package com.flashCab.rideService.event;
 
-
+import com.flashCab.rideService.model.VehicleType;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -24,4 +24,6 @@ public class RideRequestedEvent {
     private Double dropLongitude;
 
     private String dropAddress;
+
+    private VehicleType vehicleType;
 }

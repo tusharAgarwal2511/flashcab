@@ -1,6 +1,5 @@
 package com.flashCab.matchingService.event;
 
-
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -21,5 +20,7 @@ public class RideMatchedEvent {
     private Double driverLongitude;
 
     private Double distanceToPickupKm;
+
+    private String vehicleType;
 
 }

@@ -2,7 +2,7 @@ spring:
   application:
     name: rideService
   datasource:
-    url: jdbc:mysql://localhost:3306/flashcab
+    url: jdbc:mysql://localhost:3306/flashcab_rides
     username: root
     password: root
     driver-class-name: com.mysql.cj.jdbc.Driver
@@ -14,7 +14,6 @@ spring:
     properties:
       hibernate:
         dialect: org.hibernate.dialect.MySQLDialect
-
 
   kafka:
     bootstrap-servers: localhost:9092
@@ -31,13 +30,37 @@ spring:
         spring.json.use.type.headers: false
         spring.json.value.default.type: "com.flashCab.rideService.event.RideMatchedEvent"
 
+rider:
+  service:
+    url: http://localhost:8086
+
+driver:
+  service:
+    url: http://localhost:8085
+
+fare:
+  vehicle:
+    MINI:
+      base-fare: 40.0
+      per-km-rate: 10.0
+    SEDAN:
+      base-fare: 50.0
+      per-km-rate: 12.0
+    SUV:
+      base-fare: 80.0
+      per-km-rate: 18.0
+    PREMIUM:
+      base-fare: 120.0
+      per-km-rate: 25.0
+    BIKE:
+      base-fare: 20.0
+      per-km-rate: 6.0
 
 management:
   endpoints:
     web:
       exposure:
         include: health, info
-
 
 server:
   port: 8083

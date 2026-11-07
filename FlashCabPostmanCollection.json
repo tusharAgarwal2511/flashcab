@@ -38,12 +38,12 @@
     },
     {
       "key": "driverId",
-      "value": "driver:1",
+      "value": "",
       "type": "string"
     },
     {
       "key": "riderId",
-      "value": "rider-101",
+      "value": "",
       "type": "string"
     },
     {
@@ -77,7 +77,7 @@
             "method": "GET",
             "header": [],
             "url": "{{locationBaseUrl}}/api/v1/locations/drivers/seed?count=10&minLatitude=12.96&maxLatitude=12.98&minLongitude=77.58&maxLongitude=77.61",
-            "description": "Seeds 10 Redis location records named driver:1 through driver:10 near the sample pickup coordinates. Run before nearby-driver search or requesting a ride."
+            "description": "Seeds Redis locations for actual registered drivers from Driver Service. Register drivers first, then run this request to populate Redis GEO with real driver IDs."
           },
           "event": [
             {
@@ -103,7 +103,7 @@
               }
             ],
             "url": "{{locationBaseUrl}}/api/v1/locations/drivers/update",
-            "description": "Updates the seeded driver:1 location to the sample pickup point.",
+            "description": "Updates the location for the actual MongoDB driver ID stored in driverId. The driver must already exist in Driver Service before updating Redis.",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"driverId\": \"{{driverId}}\",\n  \"latitude\": 12.9716,\n  \"longitude\": 77.5946\n}",
@@ -123,11 +123,11 @@
                   "pm.test('Status is 200', function () { pm.response.to.have.status(200); });",
                   "pm.test('Location update confirmation', function () { pm.expect(pm.response.text()).to.include('Driver location updated'); });"
                 ]
-                }
               }
+            }
           ]
-      },
-      {
+        },
+        {
           "name": "3 - Find Nearby Drivers",
           "request": {
             "method": "GET",
@@ -199,10 +199,10 @@
               }
             ],
             "url": "{{rideBaseUrl}}/api/v1/rides/request",
-            "description": "Uses the UUID saved by Register Rider when run first; rider-101 is a standalone fallback. Start Location Service and Matching Service with Kafka first, then seed nearby drivers before testing ride matching.",
+            "description": "Creates a ride using the actual rider ID from Rider Service; vehicleType must be a supported value such as SEDAN, SUV, BIKE, etc.",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"riderId\": \"{{riderId}}\",\n  \"pickupLatitude\": 12.9716,\n  \"pickupLongitude\": 77.5946,\n  \"pickupAddress\": \"MG Road, Bengaluru\",\n  \"dropLatitude\": 12.975,\n  \"dropLongitude\": 77.599,\n  \"dropAddress\": \"Indiranagar, Bengaluru\"\n}",
+              "raw": "{\n  \"riderId\": \"{{riderId}}\",\n  \"pickupLatitude\": 12.9716,\n  \"pickupLongitude\": 77.5946,\n  \"pickupAddress\": \"MG Road, Bengaluru\",\n  \"dropLatitude\": 12.975,\n  \"dropLongitude\": 77.599,\n  \"dropAddress\": \"Indiranagar, Bengaluru\",\n  \"vehicleType\": \"SEDAN\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -377,192 +377,192 @@
       ]
     },
     {
-          "name": "Driver Service",
-          "item": [
+      "name": "Driver Service",
+      "item": [
+        {
+          "name": "1 - Register Driver",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{driverBaseUrl}}/api/v1/drivers",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Jordan Driver\",\n  \"email\": \"jordan.driver@example.com\",\n  \"phone\": \"+15551234567\",\n  \"vehicleType\": \"SEDAN\",\n  \"vehicleNumber\": \"ABC1234\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
             {
-              "name": "1 - Register Driver",
-              "request": {
-                "method": "POST",
-                "header": [
-                  {
-                    "key": "Content-Type",
-                    "value": "application/json"
-                  }
-                ],
-                "url": "{{driverBaseUrl}}/api/v1/drivers",
-                "body": {
-                  "mode": "raw",
-                  "raw": "{\n  \"name\": \"Jordan Driver\",\n  \"email\": \"jordan.driver@example.com\",\n  \"phone\": \"+15551234567\",\n  \"vehicleType\": \"SEDAN\",\n  \"vehicleNumber\": \"ABC1234\"\n}",
-                  "options": {
-                    "raw": {
-                      "language": "json"
-                    }
-                  }
-                }
-              },
-              "event": [
-                {
-                  "listen": "test",
-                  "script": {
-                    "type": "text/javascript",
-                    "exec": [
-                      "pm.test('Status is 201 Created', function () { pm.response.to.have.status(201); });",
-                      "pm.test('Response is JSON', function () { pm.response.to.be.json; });",
-                      "const responseBody = pm.response.json();",
-                      "const createdDriverId = responseBody.id;",
-                      "pm.test('Generated driver ID is returned', function () { pm.expect(createdDriverId).to.be.a('string').and.not.empty; });",
-                      "pm.test('Response does not include status', function () { pm.expect(responseBody).not.to.have.property('status'); });",
-                      "pm.test('Response includes createdAt', function () { pm.expect(responseBody.createdAt).to.be.a('string').and.not.empty; });",
-                      "if (createdDriverId) {",
-                      "    pm.collectionVariables.set('driverServiceDriverId', String(createdDriverId));",
-                      "    console.log('Saved driverId:', createdDriverId);",
-                      "}"
-                    ]
-                  }
-                }
-              ]
-            },
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 201 Created', function () { pm.response.to.have.status(201); });",
+                  "pm.test('Response is JSON', function () { pm.response.to.be.json; });",
+                  "const responseBody = pm.response.json();",
+                  "const createdDriverId = responseBody.id;",
+                  "pm.test('Generated driver ID is returned', function () { pm.expect(createdDriverId).to.be.a('string').and.not.empty; });",
+                  "pm.test('Response does not include status', function () { pm.expect(responseBody).not.to.have.property('status'); });",
+                  "pm.test('Response includes createdAt', function () { pm.expect(responseBody.createdAt).to.be.a('string').and.not.empty; });",
+                  "if (createdDriverId) {",
+                  "    pm.collectionVariables.set('driverServiceDriverId', String(createdDriverId));",
+                  "    console.log('Saved driverId:', createdDriverId);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "2 - Get All Drivers",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{driverBaseUrl}}/api/v1/drivers"
+          },
+          "event": [
             {
-              "name": "2 - Get All Drivers",
-              "request": {
-                "method": "GET",
-                "header": [],
-                "url": "{{driverBaseUrl}}/api/v1/drivers"
-              },
-              "event": [
-                {
-                  "listen": "test",
-                  "script": {
-                    "type": "text/javascript",
-                    "exec": [
-                      "pm.test('Status is 200', function () { pm.response.to.have.status(200); });",
-                      "pm.test('Response is an array', function () { pm.expect(pm.response.json()).to.be.an('array'); });"
-                    ]
-                  }
-                }
-              ]
-            },
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Response is an array', function () { pm.expect(pm.response.json()).to.be.an('array'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "3 - Get Driver By ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{driverBaseUrl}}/api/v1/drivers/{{driverServiceDriverId}}",
+            "description": "Run after Register Driver; that request saves the generated MongoDB ID to the driverServiceDriverId collection variable."
+          },
+          "event": [
             {
-              "name": "3 - Get Driver By ID",
-              "request": {
-                "method": "GET",
-                "header": [],
-                "url": "{{driverBaseUrl}}/api/v1/drivers/{{driverServiceDriverId}}",
-                "description": "Run after Register Driver; that request saves the generated MongoDB ID to the driverServiceDriverId collection variable."
-              },
-              "event": [
-                {
-                  "listen": "test",
-                  "script": {
-                    "type": "text/javascript",
-                    "exec": [
-                      "pm.test('Status is 200', function () { pm.response.to.have.status(200); });",
-                      "pm.test('Response is JSON', function () { pm.response.to.be.json; });"
-                    ]
-                  }
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Response is JSON', function () { pm.response.to.be.json; });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "4 - Update Driver",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{driverBaseUrl}}/api/v1/drivers/{{driverServiceDriverId}}",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Jordan Driver\",\n  \"email\": \"jordan.driver@example.com\",\n  \"phone\": \"+15551234567\",\n  \"vehicleType\": \"SEDAN\",\n  \"vehicleNumber\": \"ABC1234\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
                 }
-              ]
-            },
+              }
+            }
+          },
+          "event": [
             {
-              "name": "4 - Update Driver",
-              "request": {
-                "method": "PUT",
-                "header": [
-                  {
-                    "key": "Content-Type",
-                    "value": "application/json"
-                  }
-                ],
-                "url": "{{driverBaseUrl}}/api/v1/drivers/{{driverServiceDriverId}}",
-                "body": {
-                  "mode": "raw",
-                  "raw": "{\n  \"name\": \"Jordan Driver\",\n  \"email\": \"jordan.driver@example.com\",\n  \"phone\": \"+15551234567\",\n  \"vehicleType\": \"SEDAN\",\n  \"vehicleNumber\": \"ABC1234\"\n}",
-                  "options": {
-                    "raw": {
-                      "language": "json"
-                    }
-                  }
-                }
-              },
-              "event": [
-                {
-                  "listen": "test",
-                  "script": {
-                    "type": "text/javascript",
-                    "exec": [
-                      "pm.test('Status is 200', function () { pm.response.to.have.status(200); });",
-                      "pm.test('Response is JSON', function () { pm.response.to.be.json; });"
-                    ]
-                  }
-                }
-              ]
-            },
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Response is JSON', function () { pm.response.to.be.json; });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "5 - Delete Driver",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": "{{driverBaseUrl}}/api/v1/drivers/{{driverServiceDriverId}}",
+            "description": "Run after registering a driver. The endpoint returns 204 No Content."
+          },
+          "event": [
             {
-              "name": "5 - Delete Driver",
-              "request": {
-                "method": "DELETE",
-                "header": [],
-                "url": "{{driverBaseUrl}}/api/v1/drivers/{{driverServiceDriverId}}",
-                "description": "Run after registering a driver. The endpoint returns 204 No Content."
-              },
-              "event": [
-                {
-                  "listen": "test",
-                  "script": {
-                    "type": "text/javascript",
-                    "exec": [
-                      "pm.test('Status is 204 No Content', function () { pm.response.to.have.status(204); });"
-                    ]
-                  }
-                }
-              ]
-            },
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 204 No Content', function () { pm.response.to.have.status(204); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "6 - Health",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{driverBaseUrl}}/actuator/health",
+            "description": "Driver Service Actuator health endpoint."
+          },
+          "event": [
             {
-              "name": "6 - Health",
-                  "request": {
-                    "method": "GET",
-                    "header": [],
-                    "url": "{{driverBaseUrl}}/actuator/health",
-                    "description": "Driver Service Actuator health endpoint."
-                  },
-                  "event": [
-                    {
-                      "listen": "test",
-                      "script": {
-                        "type": "text/javascript",
-                        "exec": [
-                          "pm.test('Status is 200', function () { pm.response.to.have.status(200); });",
-                          "pm.test('Response is JSON', function () { pm.response.to.be.json; });"
-                        ]
-                      }
-                    }
-                  ]
-                },
-                {
-                  "name": "7 - Info",
-                  "request": {
-                    "method": "GET",
-                    "header": [],
-                    "url": "{{driverBaseUrl}}/actuator/info",
-                    "description": "Driver Service Actuator info endpoint."
-                  },
-                  "event": [
-                    {
-                      "listen": "test",
-                      "script": {
-                        "type": "text/javascript",
-                        "exec": [
-                          "pm.test('Status is 200', function () { pm.response.to.have.status(200); });",
-                          "pm.test('Response is JSON', function () { pm.response.to.be.json; });"
-                        ]
-                      }
-                    }
-                  ]
-                }
-              ]
-            },
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Response is JSON', function () { pm.response.to.be.json; });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "7 - Info",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{driverBaseUrl}}/actuator/info",
+            "description": "Driver Service Actuator info endpoint."
+          },
+          "event": [
             {
-              "name": "Rider Service",
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Response is JSON', function () { pm.response.to.be.json; });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Rider Service",
       "item": [
         {
           "name": "1 - Register Rider",
@@ -662,7 +662,7 @@
             "url": "{{riderBaseUrl}}/api/v1/riders/{{riderServiceRiderId}}",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"name\": \"Taylor Rider Updated\",\n  \"email\": \"taylor.updated@example.com\",\n  \"phone\": \"+15559876543\"\n}",
+              "raw": "{\n  \"name\": \"Taylor Rider Updated\",\n  \"email\": \"taylor.updated@example.com\",\n  \"phone\": \"+15559876543\",\n  \"vehicleType\": \"SEDAN\"\n}",
               "options": {
                 "raw": {
                   "language": "json"

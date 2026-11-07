@@ -16,10 +16,6 @@ import java.time.LocalDateTime;
 @NoArgsConstructor
 @AllArgsConstructor
 public class Ride {
-//    @Id
-//    @GeneratedValue(strategy = GenerationType.IDENTITY)
-//    private String id;
-
     @Id
     @GeneratedValue
     @UuidGenerator
@@ -29,6 +25,10 @@ public class Ride {
     private String riderId;
 
     private String driverId;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private VehicleType vehicleType;
 
     @Column(nullable = false)
     private Double pickupLatitude;

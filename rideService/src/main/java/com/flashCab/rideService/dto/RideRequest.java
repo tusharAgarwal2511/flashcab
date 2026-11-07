@@ -1,5 +1,6 @@
 package com.flashCab.rideService.dto;
 
+import com.flashCab.rideService.model.VehicleType;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
@@ -26,10 +27,12 @@ public class RideRequest {
     @NotNull(message = "Drop latitude id is required")
     private Double dropLatitude;
 
-    @NotNull(message = "Drop latitude id is required")
+    @NotNull(message = "Drop longitude id is required")
     private Double dropLongitude;
 
     @NotBlank(message = "Drop address is required")
     private String dropAddress;
 
+    @NotNull(message = "Vehicle type is required")
+    private VehicleType vehicleType;
 }

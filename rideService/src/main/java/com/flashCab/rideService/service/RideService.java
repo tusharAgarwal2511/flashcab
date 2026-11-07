@@ -1,15 +1,21 @@
 package com.flashCab.rideService.service;
 
+import com.flashCab.rideService.client.DriverServiceClient;
+import com.flashCab.rideService.client.RiderServiceClient;
 import com.flashCab.rideService.dto.RideRequest;
 import com.flashCab.rideService.dto.RideResponse;
 import com.flashCab.rideService.event.RideRequestedEvent;
 import com.flashCab.rideService.model.Ride;
 import com.flashCab.rideService.model.RideStatus;
+import com.flashCab.rideService.model.VehicleType;
 import com.flashCab.rideService.repository.RideRepository;
+import feign.FeignException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -23,11 +29,17 @@ public class RideService {
     private static final String RIDE_REQUESTED_TOPIC = "ride.requested";
     private final RideRepository rideRepository;
     private final KafkaTemplate<String, RideRequestedEvent> kafkaTemplate;
+    private final RiderServiceClient riderServiceClient;
+    private final DriverServiceClient driverServiceClient;
+    private final VehicleFarePolicy vehicleFarePolicy;
 
     public RideResponse requestRide(RideRequest request) {
         log.info("New ride request from rider: {}", request.getRiderId());
+        validateRiderExists(request.getRiderId());
+
         Ride ride = new Ride();
         ride.setRiderId(request.getRiderId());
+        ride.setVehicleType(request.getVehicleType());
         ride.setPickupLatitude(request.getPickupLatitude());
         ride.setPickupLongitude(request.getPickupLongitude());
         ride.setPickupAddress(request.getPickupAddress());
@@ -47,7 +59,8 @@ public class RideService {
                 savedRide.getPickupAddress(),
                 savedRide.getDropLatitude(),
                 savedRide.getDropLongitude(),
-                savedRide.getDropAddress()
+                savedRide.getDropAddress(),
+                savedRide.getVehicleType()
         );
 
         kafkaTemplate.send(RIDE_REQUESTED_TOPIC, savedRide.getId(), event);
@@ -57,20 +70,45 @@ public class RideService {
         return mapToResponse(savedRide);
     }
 
-
     public void updateRideWithDriver(String rideId, String driverId) {
+        Ride ride = rideRepository.findById(rideId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Ride not found"));
 
-        Ride ride = rideRepository.findById(rideId).orElseThrow(() -> new RuntimeException("Ride not found"));
+        if (ride.getStatus() == RideStatus.CANCELLED || ride.getStatus() == RideStatus.COMPLETED) {
+            log.warn("Ignoring matching result for ride {} in status {}", rideId, ride.getStatus());
+            return;
+        }
+
+        com.flashCab.driverService.dto.DriverResponse driver;
+        try {
+            driver = driverServiceClient.getDriverById(driverId);
+        } catch (FeignException.NotFound e) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Matched driver not found");
+        } catch (FeignException e) {
+            log.error("Driver Service unavailable while processing matched ride {}: {}", rideId, e.getMessage());
+            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "Driver Service is unavailable");
+        }
+
+        if (driver == null || driver.getVehicleType() == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Matched driver is invalid or missing vehicle type");
+        }
+
+        if (ride.getVehicleType() != null && !driver.getVehicleType().name().equals(ride.getVehicleType().name())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Matched driver vehicle type does not match the requested vehicle type");
+        }
+
         ride.setDriverId(driverId);
         ride.setStatus(RideStatus.ACCEPTED);
+        ride.setActualFare(calculateFareForVehicle(driver.getVehicleType(), ride.getPickupLatitude(), ride.getPickupLongitude(), ride.getDropLatitude(), ride.getDropLongitude()));
+        ride.setEstimatedFare(calculateEstimateFare(ride.getVehicleType(), ride.getPickupLatitude(), ride.getPickupLongitude(), ride.getDropLatitude(), ride.getDropLongitude()));
         rideRepository.save(ride);
-
     }
 
     public RideResponse startRide(String rideId) {
-        Ride ride = rideRepository.findById(rideId).orElseThrow(() -> new RuntimeException("Ride not found"));
+        Ride ride = rideRepository.findById(rideId).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Ride not found"));
         if (ride.getStatus() != RideStatus.ACCEPTED) {
-            throw new RuntimeException("Ride cannot be started, Current status: " + ride.getStatus());
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Ride cannot be started, Current status: " + ride.getStatus());
         }
         ride.setStatus(RideStatus.RIDE_STARTED);
         ride.setStartedAt(LocalDateTime.now());
@@ -79,27 +117,29 @@ public class RideService {
     }
 
     public RideResponse completeRide(String rideId) {
-
-        Ride ride = rideRepository.findById(rideId).orElseThrow(() -> new RuntimeException("Ride not found"));
+        Ride ride = rideRepository.findById(rideId).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Ride not found"));
         if (ride.getStatus() != RideStatus.RIDE_STARTED) {
-            throw new RuntimeException("Ride cannot be completed, Current status: " + ride.getStatus());
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Ride cannot be completed, Current status: " + ride.getStatus());
         }
         ride.setStatus(RideStatus.COMPLETED);
         ride.setCompletedAt(LocalDateTime.now());
-        ride.setActualFare(ride.getEstimatedFare());
+        ride.setActualFare(ride.getActualFare() != null ? ride.getActualFare() : ride.getEstimatedFare());
         rideRepository.save(ride);
         return mapToResponse(ride);
     }
 
     public RideResponse cancelRide(String rideId) {
-        Ride ride = rideRepository.findById(rideId).orElseThrow(() -> new RuntimeException("Ride not found"));
+        Ride ride = rideRepository.findById(rideId).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Ride not found"));
+        if (ride.getStatus() == RideStatus.COMPLETED || ride.getStatus() == RideStatus.CANCELLED) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Ride cannot be cancelled from current status: " + ride.getStatus());
+        }
         ride.setStatus(RideStatus.CANCELLED);
         rideRepository.save(ride);
         return mapToResponse(ride);
     }
 
     public RideResponse getRideById(String rideId) {
-        Ride ride = rideRepository.findById(rideId).orElseThrow(() -> new RuntimeException("Ride not found"));
+        Ride ride = rideRepository.findById(rideId).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Ride not found"));
         return mapToResponse(ride);
     }
 
@@ -108,23 +148,44 @@ public class RideService {
                 .stream()
                 .map(this::mapToResponse)
                 .collect(Collectors.toList());
-
     }
 
+    private void validateRiderExists(String riderId) {
+        try {
+            riderServiceClient.getRiderById(riderId);
+        } catch (FeignException.NotFound e) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Rider does not exist: " + riderId);
+        } catch (FeignException e) {
+            log.error("Unable to validate rider {} from Rider Service: {}", riderId, e.getMessage());
+            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "Rider Service is unavailable");
+        }
+    }
 
     private Double calculateEstimateFare(RideRequest request) {
-        double lat1 = Math.toRadians(request.getPickupLatitude());
-        double lat2 = Math.toRadians(request.getDropLatitude());
-        double lon1 = Math.toRadians(request.getPickupLongitude());
-        double lon2 = Math.toRadians(request.getDropLongitude());
+        return calculateEstimateFare(request.getVehicleType(), request.getPickupLatitude(), request.getPickupLongitude(), request.getDropLatitude(), request.getDropLongitude());
+    }
+
+    private Double calculateEstimateFare(VehicleType vehicleType, double pickupLatitude, double pickupLongitude, double dropLatitude, double dropLongitude) {
+        double lat1 = Math.toRadians(pickupLatitude);
+        double lat2 = Math.toRadians(dropLatitude);
+        double lon1 = Math.toRadians(pickupLongitude);
+        double lon2 = Math.toRadians(dropLongitude);
         double latDiff = lat2 - lat1;
         double lonDiff = lon1 - lon2;
 
         double a = Math.pow(Math.sin(latDiff / 2), 2) + Math.cos(lat1) * Math.cos(lat2) * Math.pow(Math.sin(lonDiff / 2), 2);
         double c = 2 * Math.asin(Math.sqrt(a));
         double distanceKm = 6371 * c;
-        double fare = 50 + (distanceKm * 12);
+        double fare = vehicleFarePolicy.getBaseFare(vehicleType) + (distanceKm * vehicleFarePolicy.getPerKmRate(vehicleType));
         return Math.round(fare * 100.0) / 100.0;
+    }
+
+    private double calculateFareForVehicle(com.flashCab.driverService.dto.DriverResponse driverResponse, double pickupLatitude, double pickupLongitude, double dropLatitude, double dropLongitude) {
+        return calculateFareForVehicle(driverResponse.getVehicleType(), pickupLatitude, pickupLongitude, dropLatitude, dropLongitude);
+    }
+
+    private double calculateFareForVehicle(com.flashCab.driverService.model.VehicleType vehicleType, double pickupLatitude, double pickupLongitude, double dropLatitude, double dropLongitude) {
+        return calculateEstimateFare(com.flashCab.rideService.model.VehicleType.valueOf(vehicleType.name()), pickupLatitude, pickupLongitude, dropLatitude, dropLongitude);
     }
 
     private RideResponse mapToResponse(Ride savedRide) {
@@ -133,6 +194,7 @@ public class RideService {
         response.setId(savedRide.getId());
         response.setRiderId(savedRide.getRiderId());
         response.setDriverId(savedRide.getDriverId());
+        response.setVehicleType(savedRide.getVehicleType());
 
         response.setPickupLatitude(savedRide.getPickupLatitude());
         response.setPickupLongitude(savedRide.getPickupLongitude());
@@ -153,6 +215,4 @@ public class RideService {
 
         return response;
     }
-
-
 }
