@@ -38,6 +38,10 @@ driver:
   service:
     url: http://localhost:8085
 
+location:
+  service:
+    url: http://localhost:8082
+
 fare:
   vehicle:
     MINI:

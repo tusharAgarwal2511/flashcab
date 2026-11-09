@@ -3,6 +3,8 @@ package com.flashCab.matchingService.client;
 import com.flashCab.matchingService.dto.NearByDriverResponse;
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 
 import java.util.List;
@@ -13,4 +15,10 @@ public interface LocationServiceClient {
     List<NearByDriverResponse> getNearByDrivers(@RequestParam double latitude,
                                                 @RequestParam double longitude,
                                                 @RequestParam double radiusInKm);
+
+    @PostMapping("/api/v1/locations/drivers/{driverId}/reserve")
+    boolean reserveDriver(@PathVariable("driverId") String driverId, @RequestParam("rideId") String rideId);
+
+    @PostMapping("/api/v1/locations/drivers/{driverId}/release")
+    boolean releaseDriver(@PathVariable("driverId") String driverId, @RequestParam("rideId") String rideId);
 }

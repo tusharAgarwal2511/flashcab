@@ -1,6 +1,7 @@
 package com.flashCab.rideService.service;
 
 import com.flashCab.rideService.client.DriverServiceClient;
+import com.flashCab.rideService.client.LocationServiceClient;
 import com.flashCab.rideService.client.OpenMeteoWeatherClient;
 import com.flashCab.rideService.client.RiderServiceClient;
 import com.flashCab.rideService.dto.OpenMeteoWeatherResponse;
@@ -37,6 +38,7 @@ public class RideService {
     private final KafkaTemplate<String, RideRequestedEvent> kafkaTemplate;
     private final RiderServiceClient riderServiceClient;
     private final DriverServiceClient driverServiceClient;
+    private final LocationServiceClient locationServiceClient;
     private final VehicleFarePolicy vehicleFarePolicy;
     private final OpenMeteoWeatherClient openMeteoWeatherClient;
 
@@ -78,11 +80,23 @@ public class RideService {
     }
 
     public void updateRideWithDriver(String rideId, String driverId) {
+        if (driverId == null || driverId.isBlank()) {
+            log.warn("Ignoring match with missing driver ID for ride {}", rideId);
+            return;
+        }
         Ride ride = rideRepository.findById(rideId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Ride not found"));
 
         if (ride.getStatus() == RideStatus.CANCELLED || ride.getStatus() == RideStatus.COMPLETED) {
             log.warn("Ignoring matching result for ride {} in status {}", rideId, ride.getStatus());
+            releaseDriverReservation(driverId, rideId);
+            return;
+        }
+
+        if (ride.getStatus() != RideStatus.REQUESTED && ride.getStatus() != RideStatus.MATCHING) {
+            if (!driverId.equals(ride.getDriverId())) {
+                releaseDriverReservation(driverId, rideId);
+            }
             return;
         }
 
@@ -90,6 +104,7 @@ public class RideService {
         try {
             driver = driverServiceClient.getDriverById(driverId);
         } catch (FeignException.NotFound e) {
+            releaseDriverReservation(driverId, rideId);
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Matched driver not found");
         } catch (FeignException e) {
             log.error("Driver Service unavailable while processing matched ride {}: {}", rideId, e.getMessage());
@@ -97,11 +112,13 @@ public class RideService {
         }
 
         if (driver == null || driver.getVehicleType() == null) {
+            releaseDriverReservation(driverId, rideId);
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                     "Matched driver is invalid or missing vehicle type");
         }
 
         if (ride.getVehicleType() != null && !driver.getVehicleType().name().equals(ride.getVehicleType().name())) {
+            releaseDriverReservation(driverId, rideId);
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                     "Matched driver vehicle type does not match the requested vehicle type");
         }
@@ -128,6 +145,10 @@ public class RideService {
     public RideResponse completeRide(String rideId) {
         Ride ride = rideRepository.findById(rideId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Ride not found"));
+        if (ride.getStatus() == RideStatus.COMPLETED) {
+            releaseAssignedDriver(ride);
+            return mapToResponse(ride);
+        }
         if (ride.getStatus() != RideStatus.RIDE_STARTED) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                     "Ride cannot be completed, Current status: " + ride.getStatus());
@@ -136,19 +157,44 @@ public class RideService {
         ride.setCompletedAt(LocalDateTime.now());
         ride.setActualFare(ride.getActualFare() != null ? ride.getActualFare() : ride.getEstimatedFare());
         rideRepository.save(ride);
+        releaseAssignedDriver(ride);
         return mapToResponse(ride);
     }
 
     public RideResponse cancelRide(String rideId) {
         Ride ride = rideRepository.findById(rideId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Ride not found"));
-        if (ride.getStatus() == RideStatus.COMPLETED || ride.getStatus() == RideStatus.CANCELLED) {
+        if (ride.getStatus() == RideStatus.COMPLETED) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                     "Ride cannot be cancelled from current status: " + ride.getStatus());
         }
+        if (ride.getStatus() == RideStatus.CANCELLED) {
+            releaseAssignedDriver(ride);
+            return mapToResponse(ride);
+        }
         ride.setStatus(RideStatus.CANCELLED);
         rideRepository.save(ride);
+        releaseAssignedDriver(ride);
         return mapToResponse(ride);
+    }
+
+    private void releaseAssignedDriver(Ride ride) {
+        if (ride.getDriverId() != null && !ride.getDriverId().isBlank()) {
+            releaseDriverReservation(ride.getDriverId(), ride.getId());
+        }
+    }
+
+    private void releaseDriverReservation(String driverId, String rideId) {
+        try {
+            boolean released = locationServiceClient.releaseDriver(driverId, rideId);
+            if (!released) {
+                log.info("No reservation for driver {} owned by ride {} was released", driverId, rideId);
+            }
+        } catch (FeignException e) {
+            log.error("Unable to release driver {} for ride {}: {}", driverId, rideId, e.getMessage());
+            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE,
+                    "Location Service is unavailable while releasing the driver");
+        }
     }
 
     public RideResponse getRideById(String rideId) {

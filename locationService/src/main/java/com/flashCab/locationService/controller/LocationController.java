@@ -34,6 +34,16 @@ public class LocationController {
         return ResponseEntity.ok(locationService.findNearByDrivers(latitude, longitude, radiusInKm));
     }
 
+    @PostMapping("/drivers/{driverId}/reserve")
+    public ResponseEntity<Boolean> reserveDriver(@PathVariable String driverId, @RequestParam String rideId) {
+        return ResponseEntity.ok(locationService.reserveDriver(driverId, rideId));
+    }
+
+    @PostMapping("/drivers/{driverId}/release")
+    public ResponseEntity<Boolean> releaseDriver(@PathVariable String driverId, @RequestParam String rideId) {
+        return ResponseEntity.ok(locationService.releaseDriver(driverId, rideId));
+    }
+
     @DeleteMapping("/drivers/{driverId}")
     public ResponseEntity<String> removeDriver(@PathVariable String driverId) {
         locationService.removeDriver(driverId);

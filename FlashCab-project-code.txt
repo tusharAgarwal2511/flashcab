@@ -137,6 +137,7 @@ Due to Maven's design, elements are inherited from the parent POM to the project
 While most of the inheritance is fine, it also inherits unwanted elements like `<license>` and `<developers>` from the parent.
 To prevent this, the project POM contains empty overrides for these elements.
 If you manually switch to a different parent and actually want the inheritance, you need to remove those overrides.
+
 FILE: driverService\mvnw
 ========================================================================
 #!/bin/sh
@@ -834,7 +835,7 @@ public class DriverController {
         driverService.deleteDriver(driverId);
         return ResponseEntity.noContent().build();
     }
-}
+} 
 FILE: driverService\src\main\java\com\flashCab\driverService\controller\GlobalExceptionHandler.java
 ========================================================================
 package com.flashCab.driverService.controller;
@@ -1992,6 +1993,7 @@ Due to Maven's design, elements are inherited from the parent POM to the project
 While most of the inheritance is fine, it also inherits unwanted elements like `<license>` and `<developers>` from the parent.
 To prevent this, the project POM contains empty overrides for these elements.
 If you manually switch to a different parent and actually want the inheritance, you need to remove those overrides.
+
 FILE: locationService\mvnw
 ========================================================================
 #!/bin/sh
@@ -2729,6 +2731,16 @@ public class LocationController {
         return ResponseEntity.ok(locationService.findNearByDrivers(latitude, longitude, radiusInKm));
     }
 
+    @PostMapping("/drivers/{driverId}/reserve")
+    public ResponseEntity<Boolean> reserveDriver(@PathVariable String driverId, @RequestParam String rideId) {
+        return ResponseEntity.ok(locationService.reserveDriver(driverId, rideId));
+    }
+
+    @PostMapping("/drivers/{driverId}/release")
+    public ResponseEntity<Boolean> releaseDriver(@PathVariable String driverId, @RequestParam String rideId) {
+        return ResponseEntity.ok(locationService.releaseDriver(driverId, rideId));
+    }
+
     @DeleteMapping("/drivers/{driverId}")
     public ResponseEntity<String> removeDriver(@PathVariable String driverId) {
         locationService.removeDriver(driverId);
@@ -2800,12 +2812,14 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.geo.*;
 import org.springframework.data.redis.connection.RedisGeoCommands;
 import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.concurrent.ThreadLocalRandom;
 
 @Service
@@ -2814,6 +2828,29 @@ import java.util.concurrent.ThreadLocalRandom;
 public class LocationService {
 
     private static final String DRIVERS_GEO_KEY = "drivers.locations";
+    private static final String DRIVER_AVAILABILITY_KEY = "drivers.availability";
+    private static final String DRIVER_RESERVATIONS_KEY = "drivers.reservations";
+    private static final DefaultRedisScript<Long> RESERVE_DRIVER_SCRIPT = new DefaultRedisScript<>("""
+            local availability = redis.call('HGET', KEYS[1], ARGV[1])
+            if not availability then
+                availability = 'true'
+                redis.call('HSET', KEYS[1], ARGV[1], availability)
+            end
+            if availability ~= 'true' or redis.call('HEXISTS', KEYS[2], ARGV[1]) == 1 then
+                return 0
+            end
+            redis.call('HSET', KEYS[1], ARGV[1], 'false')
+            redis.call('HSET', KEYS[2], ARGV[1], ARGV[2])
+            return 1
+            """, Long.class);
+    private static final DefaultRedisScript<Long> RELEASE_DRIVER_SCRIPT = new DefaultRedisScript<>("""
+            if redis.call('HGET', KEYS[2], ARGV[1]) ~= ARGV[2] then
+                return 0
+            end
+            redis.call('HSET', KEYS[1], ARGV[1], 'true')
+            redis.call('HDEL', KEYS[2], ARGV[1])
+            return 1
+            """, Long.class);
     private final RedisTemplate<String, String> redisTemplate;
     private final DriverServiceClient driverServiceClient;
 
@@ -2835,6 +2872,7 @@ public class LocationService {
         log.info("Updating location for driver: {}", driverLocationRequest.getDriverId());
         Point driverPoint = new Point(driverLocationRequest.getLongitude(), driverLocationRequest.getLatitude());
         redisTemplate.opsForGeo().add(DRIVERS_GEO_KEY, driverPoint, driverLocationRequest.getDriverId());
+        initializeAvailability(driverLocationRequest.getDriverId());
         log.info("Location updated for driver: {}", driverLocationRequest.getDriverId());
     }
 
@@ -2870,6 +2908,7 @@ public class LocationService {
             double longitude = random.nextDouble(minLon, maxLon);
             Point point = new Point(longitude, latitude);
             redisTemplate.opsForGeo().add(DRIVERS_GEO_KEY, point, driverId);
+            initializeAvailability(driverId);
         }
         return availableCount;
     }
@@ -2884,28 +2923,66 @@ public class LocationService {
                         .includeCoordinates()
                         .includeDistance()
                         .sortAscending()
-                        .limit(10)
         );
 
         List<NearByDriverResponse> nearByDrivers = new ArrayList<>();
         if (results != null) {
             results.getContent().forEach(result -> {
                 RedisGeoCommands.GeoLocation<String> location = result.getContent();
-                nearByDrivers.add(new NearByDriverResponse(
-                        location.getName(),
-                        location.getPoint().getY(),
-                        location.getPoint().getX(),
-                        result.getDistance().getValue()
-                ));
+                if (nearByDrivers.size() < 10 && isDriverAvailable(location.getName())) {
+                    nearByDrivers.add(new NearByDriverResponse(
+                            location.getName(),
+                            location.getPoint().getY(),
+                            location.getPoint().getX(),
+                            result.getDistance().getValue()
+                    ));
+                }
             });
         }
         log.info("Found {} drivers nearby", nearByDrivers.size());
         return nearByDrivers;
     }
 
+    public boolean reserveDriver(String driverId, String rideId) {
+        validateReservationIds(driverId, rideId);
+        Long reserved = redisTemplate.execute(
+                RESERVE_DRIVER_SCRIPT,
+                List.of(DRIVER_AVAILABILITY_KEY, DRIVER_RESERVATIONS_KEY),
+                driverId,
+                rideId
+        );
+        return Objects.equals(reserved, 1L);
+    }
+
+    public boolean releaseDriver(String driverId, String rideId) {
+        validateReservationIds(driverId, rideId);
+        Long released = redisTemplate.execute(
+                RELEASE_DRIVER_SCRIPT,
+                List.of(DRIVER_AVAILABILITY_KEY, DRIVER_RESERVATIONS_KEY),
+                driverId,
+                rideId
+        );
+        return Objects.equals(released, 1L);
+    }
+
     public void removeDriver(String driverId) {
         log.info("Removing driver: {}", driverId);
         redisTemplate.opsForGeo().remove(DRIVERS_GEO_KEY, driverId);
+    }
+
+    private void initializeAvailability(String driverId) {
+        redisTemplate.opsForHash().putIfAbsent(DRIVER_AVAILABILITY_KEY, driverId, "true");
+    }
+
+    private boolean isDriverAvailable(String driverId) {
+        initializeAvailability(driverId);
+        return "true".equals(redisTemplate.opsForHash().get(DRIVER_AVAILABILITY_KEY, driverId));
+    }
+
+    private void validateReservationIds(String driverId, String rideId) {
+        if (driverId == null || driverId.isBlank() || rideId == null || rideId.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Driver ID and ride ID are required");
+        }
     }
 
 }
@@ -2934,6 +3011,56 @@ class LocationServiceApplicationTests {
 	void contextLoads() {
 	}
 
+}
+FILE: locationService\src\test\java\com\flashCab\locationService\service\LocationServiceReservationTests.java
+========================================================================
+package com.flashCab.locationService.service;
+
+import com.flashCab.locationService.client.DriverServiceClient;
+import org.junit.jupiter.api.Test;
+import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.script.RedisScript;
+
+import java.util.List;
+
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+
+class LocationServiceReservationTests {
+
+    @SuppressWarnings("unchecked")
+    private final RedisTemplate<String, String> redisTemplate = mock(RedisTemplate.class);
+    private final LocationService locationService =
+            new LocationService(redisTemplate, mock(DriverServiceClient.class));
+
+    @Test
+    void reportsSuccessfulReservation() {
+        when(redisTemplate.execute(any(RedisScript.class), anyList(), eq("driver-1"), eq("ride-1")))
+                .thenReturn(1L);
+
+        assertTrue(locationService.reserveDriver("driver-1", "ride-1"));
+    }
+
+    @Test
+    void reportsUnavailableReservation() {
+        when(redisTemplate.execute(any(RedisScript.class), anyList(), eq("driver-1"), eq("ride-2")))
+                .thenReturn(0L);
+
+        assertFalse(locationService.reserveDriver("driver-1", "ride-2"));
+    }
+
+    @Test
+    void releaseOperationIncludesTheOwningRideId() {
+        when(redisTemplate.execute(any(RedisScript.class), eq(List.of("drivers.availability", "drivers.reservations")),
+                eq("driver-1"), eq("ride-1"))).thenReturn(1L);
+
+        assertTrue(locationService.releaseDriver("driver-1", "ride-1"));
+    }
 }
 FILE: matchingService\.gitattributes
 ========================================================================
@@ -3007,6 +3134,7 @@ Due to Maven's design, elements are inherited from the parent POM to the project
 While most of the inheritance is fine, it also inherits unwanted elements like `<license>` and `<developers>` from the parent.
 To prevent this, the project POM contains empty overrides for these elements.
 If you manually switch to a different parent and actually want the inheritance, you need to remove those overrides.
+
 FILE: matchingService\mvnw
 ========================================================================
 #!/bin/sh
@@ -3652,6 +3780,8 @@ package com.flashCab.matchingService.client;
 import com.flashCab.matchingService.dto.NearByDriverResponse;
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 
 import java.util.List;
@@ -3662,6 +3792,12 @@ public interface LocationServiceClient {
     List<NearByDriverResponse> getNearByDrivers(@RequestParam double latitude,
                                                 @RequestParam double longitude,
                                                 @RequestParam double radiusInKm);
+
+    @PostMapping("/api/v1/locations/drivers/{driverId}/reserve")
+    boolean reserveDriver(@PathVariable("driverId") String driverId, @RequestParam("rideId") String rideId);
+
+    @PostMapping("/api/v1/locations/drivers/{driverId}/release")
+    boolean releaseDriver(@PathVariable("driverId") String driverId, @RequestParam("rideId") String rideId);
 }
 FILE: matchingService\src\main\java\com\flashCab\matchingService\dto\DriverProfileResponse.java
 ========================================================================
@@ -3796,7 +3932,6 @@ import org.springframework.stereotype.Service;
 
 import java.util.Comparator;
 import java.util.List;
-import java.util.Optional;
 
 @Service
 @Slf4j
@@ -3862,20 +3997,32 @@ public class MatchingService {
             return;
         }
 
-        Optional<NearByDriverResponse> bestDriver = findBestDriver(nearByDrivers, filteredDrivers);
-        if (bestDriver.isEmpty()) {
+        List<RankedCandidate> rankedCandidates = rankDrivers(nearByDrivers, filteredDrivers);
+        if (rankedCandidates.isEmpty()) {
             log.warn("Could not find suitable compatible driver for ride {}", event.getRideId());
             return;
         }
 
-        NearByDriverResponse assignedDriver = bestDriver.get();
-        DriverProfileResponse matchedProfile = filteredDrivers.stream()
-                .filter(driver -> driver.getId().equals(assignedDriver.getDriverId()))
-                .findFirst()
-                .orElse(null);
+        NearByDriverResponse assignedDriver = null;
+        DriverProfileResponse matchedProfile = null;
+        for (RankedCandidate candidate : rankedCandidates) {
+            boolean reserved;
+            try {
+                reserved = locationServiceClient.reserveDriver(candidate.driver().getDriverId(), event.getRideId());
+            } catch (FeignException e) {
+                log.error("Location Service unavailable while reserving a driver for ride {}: {}",
+                        event.getRideId(), e.getMessage());
+                return;
+            }
+            if (reserved) {
+                assignedDriver = candidate.driver();
+                matchedProfile = candidate.profile();
+                break;
+            }
+        }
 
-        if (matchedProfile == null) {
-            log.warn("Matched driver profile not found for ride {}", event.getRideId());
+        if (assignedDriver == null || matchedProfile == null) {
+            log.warn("No compatible driver could be reserved for ride {}", event.getRideId());
             return;
         }
 
@@ -3892,16 +4039,29 @@ public class MatchingService {
         log.info("RideMatchedEvent published for ride {} with driver {} and vehicle type {}", event.getRideId(), assignedDriver.getDriverId(), matchedProfile.getVehicleType());
     }
 
-    private Optional<NearByDriverResponse> findBestDriver(List<NearByDriverResponse> drivers, List<DriverProfileResponse> compatibleProfiles) {
+    private List<RankedCandidate> rankDrivers(List<NearByDriverResponse> drivers,
+                                               List<DriverProfileResponse> compatibleProfiles) {
         double distanceWeight = 0.7;
         double ratingWeight = 0.3;
         return drivers.stream()
-                .filter(driver -> compatibleProfiles.stream().anyMatch(profile -> profile.getId().equals(driver.getDriverId())))
-                .max(Comparator.comparingDouble(driver -> {
-                    double distanceScore = 1.0 / (driver.getDistanceInKm() + 0.1);
-                    double simulatedRating = 4.0 + Math.random();
-                    return (distanceScore * distanceWeight) + (simulatedRating * ratingWeight);
-                }));
+                .flatMap(driver -> compatibleProfiles.stream()
+                        .filter(profile -> profile.getId() != null
+                                && profile.getId().equals(driver.getDriverId()))
+                        .findFirst()
+                        .stream()
+                        .map(profile -> new RankedCandidate(
+                                driver, profile, score(driver, distanceWeight, ratingWeight))))
+                .sorted(Comparator.comparingDouble(RankedCandidate::score).reversed())
+                .toList();
+    }
+
+    private double score(NearByDriverResponse driver, double distanceWeight, double ratingWeight) {
+        double distanceScore = 1.0 / (driver.getDistanceInKm() + 0.1);
+        double simulatedRating = 4.0 + Math.random();
+        return (distanceScore * distanceWeight) + (simulatedRating * ratingWeight);
+    }
+
+    private record RankedCandidate(NearByDriverResponse driver, DriverProfileResponse profile, double score) {
     }
 
 }
@@ -3986,6 +4146,83 @@ class MatchingServiceApplicationTests {
 	}
 
 }
+FILE: matchingService\src\test\java\com\flashCab\matchingService\MatchingServiceReservationTests.java
+========================================================================
+package com.flashCab.matchingService;
+
+import com.flashCab.matchingService.client.DriverServiceClient;
+import com.flashCab.matchingService.client.LocationServiceClient;
+import com.flashCab.matchingService.dto.DriverProfileResponse;
+import com.flashCab.matchingService.dto.NearByDriverResponse;
+import com.flashCab.matchingService.event.RideMatchedEvent;
+import com.flashCab.matchingService.event.RideRequestedEvent;
+import com.flashCab.matchingService.service.MatchingService;
+import org.junit.jupiter.api.Test;
+import org.springframework.kafka.core.KafkaTemplate;
+
+import java.util.List;
+
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyDouble;
+import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.*;
+
+class MatchingServiceReservationTests {
+
+    private final LocationServiceClient locationServiceClient = mock(LocationServiceClient.class);
+    private final DriverServiceClient driverServiceClient = mock(DriverServiceClient.class);
+    @SuppressWarnings("unchecked")
+    private final KafkaTemplate<String, RideMatchedEvent> kafkaTemplate = mock(KafkaTemplate.class);
+    private final MatchingService matchingService =
+            new MatchingService(locationServiceClient, driverServiceClient, kafkaTemplate);
+
+    @Test
+    void triesNextRankedCandidateWhenReservationFails() {
+        when(locationServiceClient.getNearByDrivers(anyDouble(), anyDouble(), anyDouble()))
+                .thenReturn(nearbyDrivers());
+        when(driverServiceClient.getDriversByIds(anyList())).thenReturn(driverProfiles());
+        when(locationServiceClient.reserveDriver(anyString(), eq("ride-1"))).thenReturn(false, true);
+
+        matchingService.matchDriverForRide(rideRequestedEvent());
+
+        verify(locationServiceClient, times(2)).reserveDriver(anyString(), eq("ride-1"));
+        verify(kafkaTemplate).send(eq("ride.matched"), eq("ride-1"), any(RideMatchedEvent.class));
+    }
+
+    @Test
+    void doesNotPublishWhenNoCandidateCanBeReserved() {
+        when(locationServiceClient.getNearByDrivers(anyDouble(), anyDouble(), anyDouble()))
+                .thenReturn(nearbyDrivers());
+        when(driverServiceClient.getDriversByIds(anyList())).thenReturn(driverProfiles());
+        when(locationServiceClient.reserveDriver(anyString(), eq("ride-1"))).thenReturn(false);
+
+        matchingService.matchDriverForRide(rideRequestedEvent());
+
+        verify(locationServiceClient, times(2)).reserveDriver(anyString(), eq("ride-1"));
+        verifyNoInteractions(kafkaTemplate);
+    }
+
+    private List<NearByDriverResponse> nearbyDrivers() {
+        return List.of(
+                new NearByDriverResponse("driver-1", 1.0, 1.0, 1.0),
+                new NearByDriverResponse("driver-2", 2.0, 2.0, 5.0)
+        );
+    }
+
+    private List<DriverProfileResponse> driverProfiles() {
+        return List.of(
+                new DriverProfileResponse("driver-1", "One", "one@example.com", "1", "SEDAN", "A"),
+                new DriverProfileResponse("driver-2", "Two", "two@example.com", "2", "SEDAN", "B")
+        );
+    }
+
+    private RideRequestedEvent rideRequestedEvent() {
+        return new RideRequestedEvent("rider-1", "ride-1", 1.0, 1.0, "pickup",
+                2.0, 2.0, "drop", "SEDAN");
+    }
+}
 FILE: riderService\.gitattributes
 ========================================================================
 /mvnw text eol=lf
@@ -4059,6 +4296,7 @@ Due to Maven's design, elements are inherited from the parent POM to the project
 While most of the inheritance is fine, it also inherits unwanted elements like `<license>` and `<developers>` from the parent.
 To prevent this, the project POM contains empty overrides for these elements.
 If you manually switch to a different parent and actually want the inheritance, you need to remove those overrides.
+
 FILE: riderService\mvnw
 ========================================================================
 #!/bin/sh
@@ -5041,6 +5279,7 @@ Due to Maven's design, elements are inherited from the parent POM to the project
 While most of the inheritance is fine, it also inherits unwanted elements like `<license>` and `<developers>` from the parent.
 To prevent this, the project POM contains empty overrides for these elements.
 If you manually switch to a different parent and actually want the inheritance, you need to remove those overrides.
+
 FILE: rideService\mvnw
 ========================================================================
 #!/bin/sh
@@ -5754,6 +5993,21 @@ public interface DriverServiceClient {
     @GetMapping("/api/v1/drivers/{driverId}")
     DriverResponse getDriverById(@PathVariable("driverId") String driverId);
 }
+FILE: rideService\src\main\java\com\flashCab\rideService\client\LocationServiceClient.java
+========================================================================
+package com.flashCab.rideService.client;
+
+import org.springframework.cloud.openfeign.FeignClient;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+
+@FeignClient(name = "locationService", url = "${location.service.url}")
+public interface LocationServiceClient {
+
+    @PostMapping("/api/v1/locations/drivers/{driverId}/release")
+    boolean releaseDriver(@PathVariable("driverId") String driverId, @RequestParam("rideId") String rideId);
+}
 FILE: rideService\src\main\java\com\flashCab\rideService\client\OpenMeteoWeatherClient.java
 ========================================================================
 package com.flashCab.rideService.client;
@@ -5870,6 +6124,8 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errors);
     }
 }
+
+
 FILE: rideService\src\main\java\com\flashCab\rideService\controller\RideController.java
 ========================================================================
 package com.flashCab.rideService.controller;
@@ -6259,6 +6515,7 @@ FILE: rideService\src\main\java\com\flashCab\rideService\service\RideService.jav
 package com.flashCab.rideService.service;
 
 import com.flashCab.rideService.client.DriverServiceClient;
+import com.flashCab.rideService.client.LocationServiceClient;
 import com.flashCab.rideService.client.OpenMeteoWeatherClient;
 import com.flashCab.rideService.client.RiderServiceClient;
 import com.flashCab.rideService.dto.OpenMeteoWeatherResponse;
@@ -6295,6 +6552,7 @@ public class RideService {
     private final KafkaTemplate<String, RideRequestedEvent> kafkaTemplate;
     private final RiderServiceClient riderServiceClient;
     private final DriverServiceClient driverServiceClient;
+    private final LocationServiceClient locationServiceClient;
     private final VehicleFarePolicy vehicleFarePolicy;
     private final OpenMeteoWeatherClient openMeteoWeatherClient;
 
@@ -6336,11 +6594,23 @@ public class RideService {
     }
 
     public void updateRideWithDriver(String rideId, String driverId) {
+        if (driverId == null || driverId.isBlank()) {
+            log.warn("Ignoring match with missing driver ID for ride {}", rideId);
+            return;
+        }
         Ride ride = rideRepository.findById(rideId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Ride not found"));
 
         if (ride.getStatus() == RideStatus.CANCELLED || ride.getStatus() == RideStatus.COMPLETED) {
             log.warn("Ignoring matching result for ride {} in status {}", rideId, ride.getStatus());
+            releaseDriverReservation(driverId, rideId);
+            return;
+        }
+
+        if (ride.getStatus() != RideStatus.REQUESTED && ride.getStatus() != RideStatus.MATCHING) {
+            if (!driverId.equals(ride.getDriverId())) {
+                releaseDriverReservation(driverId, rideId);
+            }
             return;
         }
 
@@ -6348,6 +6618,7 @@ public class RideService {
         try {
             driver = driverServiceClient.getDriverById(driverId);
         } catch (FeignException.NotFound e) {
+            releaseDriverReservation(driverId, rideId);
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Matched driver not found");
         } catch (FeignException e) {
             log.error("Driver Service unavailable while processing matched ride {}: {}", rideId, e.getMessage());
@@ -6355,11 +6626,13 @@ public class RideService {
         }
 
         if (driver == null || driver.getVehicleType() == null) {
+            releaseDriverReservation(driverId, rideId);
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                     "Matched driver is invalid or missing vehicle type");
         }
 
         if (ride.getVehicleType() != null && !driver.getVehicleType().name().equals(ride.getVehicleType().name())) {
+            releaseDriverReservation(driverId, rideId);
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                     "Matched driver vehicle type does not match the requested vehicle type");
         }
@@ -6386,6 +6659,10 @@ public class RideService {
     public RideResponse completeRide(String rideId) {
         Ride ride = rideRepository.findById(rideId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Ride not found"));
+        if (ride.getStatus() == RideStatus.COMPLETED) {
+            releaseAssignedDriver(ride);
+            return mapToResponse(ride);
+        }
         if (ride.getStatus() != RideStatus.RIDE_STARTED) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                     "Ride cannot be completed, Current status: " + ride.getStatus());
@@ -6394,19 +6671,44 @@ public class RideService {
         ride.setCompletedAt(LocalDateTime.now());
         ride.setActualFare(ride.getActualFare() != null ? ride.getActualFare() : ride.getEstimatedFare());
         rideRepository.save(ride);
+        releaseAssignedDriver(ride);
         return mapToResponse(ride);
     }
 
     public RideResponse cancelRide(String rideId) {
         Ride ride = rideRepository.findById(rideId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Ride not found"));
-        if (ride.getStatus() == RideStatus.COMPLETED || ride.getStatus() == RideStatus.CANCELLED) {
+        if (ride.getStatus() == RideStatus.COMPLETED) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                     "Ride cannot be cancelled from current status: " + ride.getStatus());
         }
+        if (ride.getStatus() == RideStatus.CANCELLED) {
+            releaseAssignedDriver(ride);
+            return mapToResponse(ride);
+        }
         ride.setStatus(RideStatus.CANCELLED);
         rideRepository.save(ride);
+        releaseAssignedDriver(ride);
         return mapToResponse(ride);
+    }
+
+    private void releaseAssignedDriver(Ride ride) {
+        if (ride.getDriverId() != null && !ride.getDriverId().isBlank()) {
+            releaseDriverReservation(ride.getDriverId(), ride.getId());
+        }
+    }
+
+    private void releaseDriverReservation(String driverId, String rideId) {
+        try {
+            boolean released = locationServiceClient.releaseDriver(driverId, rideId);
+            if (!released) {
+                log.info("No reservation for driver {} owned by ride {} was released", driverId, rideId);
+            }
+        } catch (FeignException e) {
+            log.error("Unable to release driver {} for ride {}: {}", driverId, rideId, e.getMessage());
+            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE,
+                    "Location Service is unavailable while releasing the driver");
+        }
     }
 
     public RideResponse getRideById(String rideId) {
@@ -6684,6 +6986,10 @@ driver:
   service:
     url: http://localhost:8085
 
+location:
+  service:
+    url: http://localhost:8082
+
 fare:
   vehicle:
     MINI:
@@ -6710,6 +7016,91 @@ management:
 
 server:
   port: 8083
+FILE: rideService\src\test\java\com\flashCab\rideService\RideDriverAvailabilityTests.java
+========================================================================
+package com.flashCab.rideService;
+
+import com.flashCab.rideService.client.DriverServiceClient;
+import com.flashCab.rideService.client.LocationServiceClient;
+import com.flashCab.rideService.client.OpenMeteoWeatherClient;
+import com.flashCab.rideService.client.RiderServiceClient;
+import com.flashCab.rideService.event.RideRequestedEvent;
+import com.flashCab.rideService.model.Ride;
+import com.flashCab.rideService.model.RideStatus;
+import com.flashCab.rideService.repository.RideRepository;
+import com.flashCab.rideService.service.RideService;
+import com.flashCab.rideService.service.VehicleFarePolicy;
+import org.junit.jupiter.api.Test;
+import org.springframework.kafka.core.KafkaTemplate;
+
+import java.util.Optional;
+
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.*;
+
+class RideDriverAvailabilityTests {
+
+    private final RideRepository rideRepository = mock(RideRepository.class);
+    @SuppressWarnings("unchecked")
+    private final KafkaTemplate<String, RideRequestedEvent> kafkaTemplate = mock(KafkaTemplate.class);
+    private final RiderServiceClient riderServiceClient = mock(RiderServiceClient.class);
+    private final DriverServiceClient driverServiceClient = mock(DriverServiceClient.class);
+    private final LocationServiceClient locationServiceClient = mock(LocationServiceClient.class);
+    private final VehicleFarePolicy vehicleFarePolicy = mock(VehicleFarePolicy.class);
+    private final OpenMeteoWeatherClient openMeteoWeatherClient = mock(OpenMeteoWeatherClient.class);
+    private final RideService rideService = new RideService(
+            rideRepository,
+            kafkaTemplate,
+            riderServiceClient,
+            driverServiceClient,
+            locationServiceClient,
+            vehicleFarePolicy,
+            openMeteoWeatherClient);
+
+    @Test
+    void completingRideReleasesItsAssignedDriver() {
+        Ride ride = rideWithStatus(RideStatus.RIDE_STARTED, "driver-1");
+        when(rideRepository.findById("ride-1")).thenReturn(Optional.of(ride));
+        when(rideRepository.save(any(Ride.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(locationServiceClient.releaseDriver("driver-1", "ride-1")).thenReturn(true);
+
+        rideService.completeRide("ride-1");
+
+        verify(locationServiceClient).releaseDriver("driver-1", "ride-1");
+    }
+
+    @Test
+    void cancellingUnmatchedRideDoesNotReleaseAnyDriver() {
+        Ride ride = rideWithStatus(RideStatus.MATCHING, null);
+        when(rideRepository.findById("ride-1")).thenReturn(Optional.of(ride));
+        when(rideRepository.save(any(Ride.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        rideService.cancelRide("ride-1");
+
+        verifyNoInteractions(locationServiceClient);
+    }
+
+    @Test
+    void cancellingAssignedRideReleasesOnlyItsReservation() {
+        Ride ride = rideWithStatus(RideStatus.ACCEPTED, "driver-1");
+        when(rideRepository.findById("ride-1")).thenReturn(Optional.of(ride));
+        when(rideRepository.save(any(Ride.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(locationServiceClient.releaseDriver("driver-1", "ride-1")).thenReturn(true);
+
+        rideService.cancelRide("ride-1");
+
+        verify(locationServiceClient).releaseDriver("driver-1", "ride-1");
+        verifyNoMoreInteractions(locationServiceClient);
+    }
+
+    private Ride rideWithStatus(RideStatus status, String driverId) {
+        Ride ride = new Ride();
+        ride.setId("ride-1");
+        ride.setStatus(status);
+        ride.setDriverId(driverId);
+        return ride;
+    }
+}
 FILE: rideService\src\test\java\com\flashCab\rideService\RideServiceApplicationTests.java
 ========================================================================
 package com.flashCab.rideService;

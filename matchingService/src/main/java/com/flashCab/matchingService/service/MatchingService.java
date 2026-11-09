@@ -15,7 +15,6 @@ import org.springframework.stereotype.Service;
 
 import java.util.Comparator;
 import java.util.List;
-import java.util.Optional;
 
 @Service
 @Slf4j
@@ -81,20 +80,32 @@ public class MatchingService {
             return;
         }
 
-        Optional<NearByDriverResponse> bestDriver = findBestDriver(nearByDrivers, filteredDrivers);
-        if (bestDriver.isEmpty()) {
+        List<RankedCandidate> rankedCandidates = rankDrivers(nearByDrivers, filteredDrivers);
+        if (rankedCandidates.isEmpty()) {
             log.warn("Could not find suitable compatible driver for ride {}", event.getRideId());
             return;
         }
 
-        NearByDriverResponse assignedDriver = bestDriver.get();
-        DriverProfileResponse matchedProfile = filteredDrivers.stream()
-                .filter(driver -> driver.getId().equals(assignedDriver.getDriverId()))
-                .findFirst()
-                .orElse(null);
+        NearByDriverResponse assignedDriver = null;
+        DriverProfileResponse matchedProfile = null;
+        for (RankedCandidate candidate : rankedCandidates) {
+            boolean reserved;
+            try {
+                reserved = locationServiceClient.reserveDriver(candidate.driver().getDriverId(), event.getRideId());
+            } catch (FeignException e) {
+                log.error("Location Service unavailable while reserving a driver for ride {}: {}",
+                        event.getRideId(), e.getMessage());
+                return;
+            }
+            if (reserved) {
+                assignedDriver = candidate.driver();
+                matchedProfile = candidate.profile();
+                break;
+            }
+        }
 
-        if (matchedProfile == null) {
-            log.warn("Matched driver profile not found for ride {}", event.getRideId());
+        if (assignedDriver == null || matchedProfile == null) {
+            log.warn("No compatible driver could be reserved for ride {}", event.getRideId());
             return;
         }
 
@@ -111,16 +122,29 @@ public class MatchingService {
         log.info("RideMatchedEvent published for ride {} with driver {} and vehicle type {}", event.getRideId(), assignedDriver.getDriverId(), matchedProfile.getVehicleType());
     }
 
-    private Optional<NearByDriverResponse> findBestDriver(List<NearByDriverResponse> drivers, List<DriverProfileResponse> compatibleProfiles) {
+    private List<RankedCandidate> rankDrivers(List<NearByDriverResponse> drivers,
+                                               List<DriverProfileResponse> compatibleProfiles) {
         double distanceWeight = 0.7;
         double ratingWeight = 0.3;
         return drivers.stream()
-                .filter(driver -> compatibleProfiles.stream().anyMatch(profile -> profile.getId().equals(driver.getDriverId())))
-                .max(Comparator.comparingDouble(driver -> {
-                    double distanceScore = 1.0 / (driver.getDistanceInKm() + 0.1);
-                    double simulatedRating = 4.0 + Math.random();
-                    return (distanceScore * distanceWeight) + (simulatedRating * ratingWeight);
-                }));
+                .flatMap(driver -> compatibleProfiles.stream()
+                        .filter(profile -> profile.getId() != null
+                                && profile.getId().equals(driver.getDriverId()))
+                        .findFirst()
+                        .stream()
+                        .map(profile -> new RankedCandidate(
+                                driver, profile, score(driver, distanceWeight, ratingWeight))))
+                .sorted(Comparator.comparingDouble(RankedCandidate::score).reversed())
+                .toList();
+    }
+
+    private double score(NearByDriverResponse driver, double distanceWeight, double ratingWeight) {
+        double distanceScore = 1.0 / (driver.getDistanceInKm() + 0.1);
+        double simulatedRating = 4.0 + Math.random();
+        return (distanceScore * distanceWeight) + (simulatedRating * ratingWeight);
+    }
+
+    private record RankedCandidate(NearByDriverResponse driver, DriverProfileResponse profile, double score) {
     }
 
 }
