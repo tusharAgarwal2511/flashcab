@@ -9,6 +9,7 @@
         <option value="$PROJECT_DIR$/matchingService/pom.xml" />
         <option value="$PROJECT_DIR$/driverService/pom.xml" />
         <option value="$PROJECT_DIR$/riderService/pom.xml" />
+        <option value="$PROJECT_DIR$/gatewayService/pom.xml" />
       </list>
     </option>
   </component>

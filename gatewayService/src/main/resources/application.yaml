@@ -1,0 +1,27 @@
+spring:
+  application:
+    name: gatewayService
+  cloud:
+    gateway:
+      server:
+        webflux:
+          routes:
+            - id: riders
+              uri: http://localhost:8086
+              predicates:
+                - Path=/api/v1/riders/**
+            - id: drivers
+              uri: http://localhost:8085
+              predicates:
+                - Path=/api/v1/drivers/**
+            - id: locations
+              uri: http://localhost:8082
+              predicates:
+                - Path=/api/v1/locations/**
+            - id: rides
+              uri: http://localhost:8083
+              predicates:
+                - Path=/api/v1/rides/**
+
+server:
+  port: 8081

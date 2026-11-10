@@ -7,6 +7,11 @@
   },
   "variable": [
     {
+      "key": "gatewayBaseUrl",
+      "value": "http://localhost:8081",
+      "type": "string"
+    },
+    {
       "key": "locationBaseUrl",
       "value": "http://localhost:8082",
       "type": "string"
@@ -76,7 +81,7 @@
           "request": {
             "method": "GET",
             "header": [],
-            "url": "{{locationBaseUrl}}/api/v1/locations/drivers/seed?count=10&minLatitude=12.96&maxLatitude=12.98&minLongitude=77.58&maxLongitude=77.61",
+            "url": "{{gatewayBaseUrl}}/api/v1/locations/drivers/seed?count=10&minLatitude=12.96&maxLatitude=12.98&minLongitude=77.58&maxLongitude=77.61",
             "description": "Seeds Redis locations for actual registered drivers from Driver Service. Register drivers first, then run this request to populate Redis GEO with real driver IDs."
           },
           "event": [
@@ -102,7 +107,7 @@
                 "value": "application/json"
               }
             ],
-            "url": "{{locationBaseUrl}}/api/v1/locations/drivers/update",
+            "url": "{{gatewayBaseUrl}}/api/v1/locations/drivers/update",
             "description": "Updates the location for the actual MongoDB driver ID stored in driverId. The driver must already exist in Driver Service before updating Redis.",
             "body": {
               "mode": "raw",
@@ -132,7 +137,7 @@
           "request": {
             "method": "GET",
             "header": [],
-            "url": "{{locationBaseUrl}}/api/v1/locations/drivers/nearby?latitude={{latitude}}&longitude={{longitude}}&radiusInKm={{radiusInKm}}"
+            "url": "{{gatewayBaseUrl}}/api/v1/locations/drivers/nearby?latitude={{latitude}}&longitude={{longitude}}&radiusInKm={{radiusInKm}}"
           },
           "event": [
             {
@@ -152,7 +157,7 @@
           "request": {
             "method": "DELETE",
             "header": [],
-            "url": "{{locationBaseUrl}}/api/v1/locations/drivers/{{driverId}}"
+            "url": "{{gatewayBaseUrl}}/api/v1/locations/drivers/{{driverId}}"
           },
           "event": [
             {
@@ -166,22 +171,6 @@
               }
             }
           ]
-        },
-        {
-          "name": "5 - Health",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": "{{locationBaseUrl}}/actuator/health"
-          }
-        },
-        {
-          "name": "6 - Info",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": "{{locationBaseUrl}}/actuator/info"
-          }
         }
       ]
     },
@@ -198,7 +187,7 @@
                 "value": "application/json"
               }
             ],
-            "url": "{{rideBaseUrl}}/api/v1/rides/request",
+            "url": "{{gatewayBaseUrl}}/api/v1/rides/request",
             "description": "Creates a ride using the actual rider ID from Rider Service; vehicleType must be a supported value such as SEDAN, SUV, BIKE, etc.",
             "body": {
               "mode": "raw",
@@ -238,7 +227,7 @@
           "request": {
             "method": "GET",
             "header": [],
-            "url": "{{rideBaseUrl}}/api/v1/rides/{{rideId}}",
+            "url": "{{gatewayBaseUrl}}/api/v1/rides/{{rideId}}",
             "description": "Run after Request Ride. The rideId variable is populated from ride creation if response contains rideId or id."
           },
           "event": [
@@ -259,7 +248,7 @@
           "request": {
             "method": "GET",
             "header": [],
-            "url": "{{rideBaseUrl}}/api/v1/rides/rider/{{riderId}}"
+            "url": "{{gatewayBaseUrl}}/api/v1/rides/rider/{{riderId}}"
           },
           "event": [
             {
@@ -279,7 +268,7 @@
           "request": {
             "method": "PUT",
             "header": [],
-            "url": "{{rideBaseUrl}}/api/v1/rides/{{rideId}}/start",
+            "url": "{{gatewayBaseUrl}}/api/v1/rides/{{rideId}}/start",
             "description": "Run only after matching has processed the ride and its status is ACCEPTED. The ride.requested event is handled asynchronously by Matching Service."
           },
           "event": [
@@ -300,7 +289,7 @@
           "request": {
             "method": "PUT",
             "header": [],
-            "url": "{{rideBaseUrl}}/api/v1/rides/{{rideId}}/complete",
+            "url": "{{gatewayBaseUrl}}/api/v1/rides/{{rideId}}/complete",
             "description": "Run after Start Ride succeeds."
           },
           "event": [
@@ -321,7 +310,7 @@
           "request": {
             "method": "PUT",
             "header": [],
-            "url": "{{rideBaseUrl}}/api/v1/rides/{{rideId}}/cancel",
+            "url": "{{gatewayBaseUrl}}/api/v1/rides/{{rideId}}/cancel",
             "description": "For a separate cancellation test, run Request Ride again immediately before this request; rideId is updated from the new response."
           },
           "event": [
@@ -336,46 +325,13 @@
               }
             }
           ]
-        },
-        {
-          "name": "7 - Health",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": "{{rideBaseUrl}}/actuator/health"
-          }
-        },
-        {
-          "name": "8 - Info",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": "{{rideBaseUrl}}/actuator/info"
-          }
         }
       ]
     },
     {
       "name": "Matching Service",
       "description": "Matching Service has no business REST controller; ride matching is triggered by Kafka events. Only its configured Actuator endpoints are callable over HTTP.",
-      "item": [
-        {
-          "name": "1 - Health",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": "http://localhost:8084/actuator/health"
-          }
-        },
-        {
-          "name": "2 - Info",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": "http://localhost:8084/actuator/info"
-          }
-        }
-      ]
+      "item": []
     },
     {
       "name": "Driver Service",
@@ -390,7 +346,7 @@
                 "value": "application/json"
               }
             ],
-            "url": "{{driverBaseUrl}}/api/v1/drivers",
+            "url": "{{gatewayBaseUrl}}/api/v1/drivers",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"name\": \"Jordan Driver\",\n  \"email\": \"jordan.driver@example.com\",\n  \"phone\": \"+15551234567\",\n  \"vehicleType\": \"SEDAN\",\n  \"vehicleNumber\": \"ABC1234\"\n}",
@@ -428,7 +384,7 @@
           "request": {
             "method": "GET",
             "header": [],
-            "url": "{{driverBaseUrl}}/api/v1/drivers"
+            "url": "{{gatewayBaseUrl}}/api/v1/drivers"
           },
           "event": [
             {
@@ -448,7 +404,7 @@
           "request": {
             "method": "GET",
             "header": [],
-            "url": "{{driverBaseUrl}}/api/v1/drivers/{{driverServiceDriverId}}",
+            "url": "{{gatewayBaseUrl}}/api/v1/drivers/{{driverServiceDriverId}}",
             "description": "Run after Register Driver; that request saves the generated MongoDB ID to the driverServiceDriverId collection variable."
           },
           "event": [
@@ -474,7 +430,7 @@
                 "value": "application/json"
               }
             ],
-            "url": "{{driverBaseUrl}}/api/v1/drivers/{{driverServiceDriverId}}",
+            "url": "{{gatewayBaseUrl}}/api/v1/drivers/{{driverServiceDriverId}}",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"name\": \"Jordan Driver\",\n  \"email\": \"jordan.driver@example.com\",\n  \"phone\": \"+15551234567\",\n  \"vehicleType\": \"SEDAN\",\n  \"vehicleNumber\": \"ABC1234\"\n}",
@@ -503,7 +459,7 @@
           "request": {
             "method": "DELETE",
             "header": [],
-            "url": "{{driverBaseUrl}}/api/v1/drivers/{{driverServiceDriverId}}",
+            "url": "{{gatewayBaseUrl}}/api/v1/drivers/{{driverServiceDriverId}}",
             "description": "Run after registering a driver. The endpoint returns 204 No Content."
           },
           "event": [
@@ -513,48 +469,6 @@
                 "type": "text/javascript",
                 "exec": [
                   "pm.test('Status is 204 No Content', function () { pm.response.to.have.status(204); });"
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "name": "6 - Health",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": "{{driverBaseUrl}}/actuator/health",
-            "description": "Driver Service Actuator health endpoint."
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test('Status is 200', function () { pm.response.to.have.status(200); });",
-                  "pm.test('Response is JSON', function () { pm.response.to.be.json; });"
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "name": "7 - Info",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": "{{driverBaseUrl}}/actuator/info",
-            "description": "Driver Service Actuator info endpoint."
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test('Status is 200', function () { pm.response.to.have.status(200); });",
-                  "pm.test('Response is JSON', function () { pm.response.to.be.json; });"
                 ]
               }
             }
@@ -575,7 +489,7 @@
                 "value": "application/json"
               }
             ],
-            "url": "{{riderBaseUrl}}/api/v1/riders",
+            "url": "{{gatewayBaseUrl}}/api/v1/riders",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"name\": \"Taylor Rider\",\n  \"email\": \"taylor.rider@example.com\",\n  \"phone\": \"+15557654321\"\n}",
@@ -614,7 +528,7 @@
           "request": {
             "method": "GET",
             "header": [],
-            "url": "{{riderBaseUrl}}/api/v1/riders"
+            "url": "{{gatewayBaseUrl}}/api/v1/riders"
           },
           "event": [
             {
@@ -634,7 +548,7 @@
           "request": {
             "method": "GET",
             "header": [],
-            "url": "{{riderBaseUrl}}/api/v1/riders/{{riderServiceRiderId}}",
+            "url": "{{gatewayBaseUrl}}/api/v1/riders/{{riderServiceRiderId}}",
             "description": "Run after Register Rider; its test saves the generated UUID to riderServiceRiderId."
           },
           "event": [
@@ -660,7 +574,7 @@
                 "value": "application/json"
               }
             ],
-            "url": "{{riderBaseUrl}}/api/v1/riders/{{riderServiceRiderId}}",
+            "url": "{{gatewayBaseUrl}}/api/v1/riders/{{riderServiceRiderId}}",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"name\": \"Taylor Rider Updated\",\n  \"email\": \"taylor.updated@example.com\",\n  \"phone\": \"+15559876543\",\n  \"vehicleType\": \"SEDAN\"\n}",
@@ -694,7 +608,7 @@
           "request": {
             "method": "DELETE",
             "header": [],
-            "url": "{{riderBaseUrl}}/api/v1/riders/{{riderServiceRiderId}}",
+            "url": "{{gatewayBaseUrl}}/api/v1/riders/{{riderServiceRiderId}}",
             "description": "Run after registering a rider. The endpoint returns 204 No Content."
           },
           "event": [
@@ -704,48 +618,6 @@
                 "type": "text/javascript",
                 "exec": [
                   "pm.test('Status is 204 No Content', function () { pm.response.to.have.status(204); });"
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "name": "6 - Health",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": "{{riderBaseUrl}}/actuator/health",
-            "description": "Rider Service Actuator health endpoint."
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test('Status is 200', function () { pm.response.to.have.status(200); });",
-                  "pm.test('Response is JSON', function () { pm.response.to.be.json; });"
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "name": "7 - Info",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": "{{riderBaseUrl}}/actuator/info",
-            "description": "Rider Service Actuator info endpoint."
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test('Status is 200', function () { pm.response.to.have.status(200); });",
-                  "pm.test('Response is JSON', function () { pm.response.to.be.json; });"
                 ]
               }
             }
