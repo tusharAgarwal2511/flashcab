@@ -1,4 +1,4 @@
-﻿FLASHCAB PROJECT CODE
+FLASHCAB PROJECT CODE
 Generated from the current working tree. Each section begins with its project-relative file path.
 Build output, Git metadata, and IDE metadata are excluded. Credential-like values are redacted in this snapshot.
 ========================================================================
@@ -19,7 +19,7 @@ services:
     image: mysql:latest
     container_name: mysql
     environment:
-      MYSQL_ROOT_PASSWORD: <REDACTED>
+      MYSQL_ROOT_PASSWORD=<REDACTED>
     ports:
       - "3306:3306"
     volumes:
@@ -64,10 +64,12 @@ volumes:
 networks:
   flashcab:
     driver: bridge
+========================================================================
 FILE: driverService\.gitattributes
 ========================================================================
 /mvnw text eol=lf
 *.cmd text eol=crlf
+========================================================================
 FILE: driverService\.gitignore
 ========================================================================
 HELP.md
@@ -103,11 +105,7 @@ build/
 
 ### VS Code ###
 .vscode/
-FILE: driverService\.mvn\wrapper\maven-wrapper.properties
 ========================================================================
-wrapperVersion=3.3.4
-distributionType=only-script
-distributionUrl=https://repo.maven.apache.org/maven2/org/apache/maven/apache-maven/3.10.0/apache-maven-3.10.0-bin.zip
 FILE: driverService\HELP.md
 ========================================================================
 # Getting Started
@@ -138,6 +136,7 @@ While most of the inheritance is fine, it also inherits unwanted elements like `
 To prevent this, the project POM contains empty overrides for these elements.
 If you manually switch to a different parent and actually want the inheritance, you need to remove those overrides.
 
+========================================================================
 FILE: driverService\mvnw
 ========================================================================
 #!/bin/sh
@@ -328,7 +327,7 @@ __MVNW_QUIET_WGET=--quiet __MVNW_QUIET_CURL=--silent __MVNW_QUIET_UNZIP=-q __MVN
 [ "${MVNW_VERBOSE-}" != true ] || __MVNW_QUIET_WGET='' __MVNW_QUIET_CURL='' __MVNW_QUIET_UNZIP='' __MVNW_QUIET_TAR=v
 
 # normalize http auth
-case "${MVNW_PASSWORD:+has-password}" in
+case "${MVNW_PASSWORD=<REDACTED> in
 '') MVNW_USERNAME='' MVNW_PASSWORD='' ;;
 has-password) [ -n "${MVNW_USERNAME-}" ] || MVNW_USERNAME='' MVNW_PASSWORD='' ;;
 esac
@@ -435,6 +434,7 @@ mv -- "$TMP_DOWNLOAD_DIR/$actualDistributionDir" "$MAVEN_HOME" || [ -d "$MAVEN_H
 
 clean || :
 exec_maven "$@"
+========================================================================
 FILE: driverService\mvnw.cmd
 ========================================================================
 <# : batch portion
@@ -478,8 +478,7 @@ FILE: driverService\mvnw.cmd
 @SET __MVNW_PSMODULEP_SAVE=
 @SET __MVNW_ARG0_NAME__=
 @SET MVNW_USERNAME=
-@SET MVNW_PASSWORD=
-@IF NOT "%__MVNW_CMD__%"=="" ("%__MVNW_CMD__%" %*)
+@SET MVNW_PASSWORD=<REDACTED> NOT "%__MVNW_CMD__%"=="" ("%__MVNW_CMD__%" %*)
 @echo Cannot start maven from wrapper >&2 && exit /b 1
 @GOTO :EOF
 : end batch / begin powershell #>
@@ -626,6 +625,7 @@ try {
 }
 
 Write-Output "MVN_CMD=$MAVEN_HOME/bin/$MVN_CMD"
+========================================================================
 FILE: driverService\pom.xml
 ========================================================================
 <?xml version="1.0" encoding="UTF-8"?>
@@ -659,6 +659,7 @@ FILE: driverService\pom.xml
 	<properties>
 		<java.version>17</java.version>
 		<spring-cloud.version>2025.1.4</spring-cloud.version>
+		<springdoc.version>3.0.0</springdoc.version>
 	</properties>
 	<dependencies>
 		<dependency>
@@ -676,6 +677,11 @@ FILE: driverService\pom.xml
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-webmvc</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.springdoc</groupId>
+			<artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+			<version>${springdoc.version}</version>
 		</dependency>
 		<dependency>
 			<groupId>org.springframework.cloud</groupId>
@@ -767,6 +773,7 @@ FILE: driverService\pom.xml
 	</build>
 
 </project>
+========================================================================
 FILE: driverService\src\main\java\com\flashCab\driverService\client\LocationServiceClient.java
 ========================================================================
 package com.flashCab.driverService.client;
@@ -781,6 +788,28 @@ public interface LocationServiceClient {
     @DeleteMapping("/api/v1/locations/drivers/{driverId}")
     void removeDriverLocation(@PathVariable("driverId") String driverId);
 }
+========================================================================
+FILE: driverService\src\main\java\com\flashCab\driverService\config\OpenApiConfig.java
+========================================================================
+package com.flashCab.driverService.config;
+
+import io.swagger.v3.oas.models.OpenAPI;
+import io.swagger.v3.oas.models.info.Info;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+
+@Configuration
+public class OpenApiConfig {
+
+    @Bean
+    public OpenAPI driverServiceOpenAPI() {
+        return new OpenAPI().info(new Info()
+                .title("FlashCab Driver Service API")
+                .description("API for registering and managing FlashCab drivers.")
+                .version("1.0.0"));
+    }
+}
+========================================================================
 FILE: driverService\src\main\java\com\flashCab\driverService\controller\DriverController.java
 ========================================================================
 package com.flashCab.driverService.controller;
@@ -788,6 +817,14 @@ package com.flashCab.driverService.controller;
 import com.flashCab.driverService.dto.DriverRequest;
 import com.flashCab.driverService.dto.DriverResponse;
 import com.flashCab.driverService.service.DriverService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.ArraySchema;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -799,43 +836,76 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/v1/drivers")
 @RequiredArgsConstructor
+@Tag(name = "Drivers", description = "Driver registration and profile management")
 public class DriverController {
 
     private final DriverService driverService;
 
     @PostMapping
+    @Operation(
+            summary = "Register a driver",
+            description = "Creates a driver profile with contact and vehicle details.",
+            requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(
+                    description = "Driver profile and vehicle details", required = true,
+                    content = @Content(schema = @Schema(implementation = DriverRequest.class))))
+    @ApiResponses(@ApiResponse(responseCode = "201", description = "Driver registered",
+            content = @Content(schema = @Schema(implementation = DriverResponse.class))))
     public ResponseEntity<DriverResponse> registerDriver(@Valid @RequestBody DriverRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED).body(driverService.registerDriver(request));
     }
 
     @GetMapping
+    @Operation(summary = "List drivers", description = "Returns all registered drivers.")
+    @ApiResponses(@ApiResponse(responseCode = "200", description = "Driver list",
+            content = @Content(array = @ArraySchema(schema = @Schema(implementation = DriverResponse.class)))))
     public ResponseEntity<List<DriverResponse>> getAllDrivers() {
         return ResponseEntity.ok(driverService.getAllDrivers());
     }
 
     @GetMapping("/batch")
-    public ResponseEntity<List<DriverResponse>> getDriversByIds(@RequestParam("ids") List<String> ids) {
+    @Operation(summary = "Get drivers by identifiers", description = "Returns drivers matching the supplied identifier list.")
+    @ApiResponses(@ApiResponse(responseCode = "200", description = "Matching drivers",
+            content = @Content(array = @ArraySchema(schema = @Schema(implementation = DriverResponse.class)))))
+    public ResponseEntity<List<DriverResponse>> getDriversByIds(
+            @Parameter(description = "Driver identifiers to retrieve", required = true)
+            @RequestParam("ids") List<String> ids) {
         return ResponseEntity.ok(driverService.getDriversByIds(ids));
     }
 
     @GetMapping("/{driverId}")
-    public ResponseEntity<DriverResponse> getDriverById(@PathVariable String driverId) {
+    @Operation(summary = "Get a driver", description = "Returns a driver by identifier.")
+    @ApiResponses(@ApiResponse(responseCode = "200", description = "Driver profile",
+            content = @Content(schema = @Schema(implementation = DriverResponse.class))))
+    public ResponseEntity<DriverResponse> getDriverById(
+            @Parameter(description = "Identifier of the driver", required = true) @PathVariable String driverId) {
         return ResponseEntity.ok(driverService.getDriverById(driverId));
     }
 
     @PutMapping("/{driverId}")
+    @Operation(
+            summary = "Update a driver",
+            description = "Replaces the driver profile details for the specified identifier.",
+            requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(
+                    description = "Updated driver profile and vehicle details", required = true,
+                    content = @Content(schema = @Schema(implementation = DriverRequest.class))))
+    @ApiResponses(@ApiResponse(responseCode = "200", description = "Updated driver profile",
+            content = @Content(schema = @Schema(implementation = DriverResponse.class))))
     public ResponseEntity<DriverResponse> updateDriver(
-            @PathVariable String driverId,
+            @Parameter(description = "Identifier of the driver", required = true) @PathVariable String driverId,
             @Valid @RequestBody DriverRequest request) {
         return ResponseEntity.ok(driverService.updateDriver(driverId, request));
     }
 
     @DeleteMapping("/{driverId}")
-    public ResponseEntity<Void> deleteDriver(@PathVariable String driverId) {
+    @Operation(summary = "Delete a driver", description = "Deletes the driver with the specified identifier.")
+    @ApiResponses(@ApiResponse(responseCode = "204", description = "Driver deleted"))
+    public ResponseEntity<Void> deleteDriver(
+            @Parameter(description = "Identifier of the driver", required = true) @PathVariable String driverId) {
         driverService.deleteDriver(driverId);
         return ResponseEntity.noContent().build();
     }
 } 
+========================================================================
 FILE: driverService\src\main\java\com\flashCab\driverService\controller\GlobalExceptionHandler.java
 ========================================================================
 package com.flashCab.driverService.controller;
@@ -870,6 +940,7 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(ex.getStatusCode()).body(errors);
     }
 }
+========================================================================
 FILE: driverService\src\main\java\com\flashCab\driverService\DriverServiceApplication.java
 ========================================================================
 package com.flashCab.driverService;
@@ -887,6 +958,7 @@ public class DriverServiceApplication {
 	}
 
 }
+========================================================================
 FILE: driverService\src\main\java\com\flashCab\driverService\dto\DriverBatchRequest.java
 ========================================================================
 package com.flashCab.driverService.dto;
@@ -903,6 +975,7 @@ import java.util.List;
 public class DriverBatchRequest {
     private List<String> driverIds;
 }
+========================================================================
 FILE: driverService\src\main\java\com\flashCab\driverService\dto\DriverRequest.java
 ========================================================================
 package com.flashCab.driverService.dto;
@@ -932,6 +1005,7 @@ public class DriverRequest {
     @NotBlank(message = "Vehicle number is required")
     private String vehicleNumber;
 }
+========================================================================
 FILE: driverService\src\main\java\com\flashCab\driverService\dto\DriverResponse.java
 ========================================================================
 package com.flashCab.driverService.dto;
@@ -962,6 +1036,7 @@ public class DriverResponse {
 
     private LocalDateTime createdAt;
 }
+========================================================================
 FILE: driverService\src\main\java\com\flashCab\driverService\model\Driver.java
 ========================================================================
 package com.flashCab.driverService.model;
@@ -995,6 +1070,7 @@ public class Driver {
 
     private LocalDateTime createdAt;
 }
+========================================================================
 FILE: driverService\src\main\java\com\flashCab\driverService\model\VehicleType.java
 ========================================================================
 package com.flashCab.driverService.model;
@@ -1006,6 +1082,7 @@ public enum VehicleType {
     PREMIUM,
     BIKE
 }
+========================================================================
 FILE: driverService\src\main\java\com\flashCab\driverService\repository\DriverRepository.java
 ========================================================================
 package com.flashCab.driverService.repository;
@@ -1015,6 +1092,7 @@ import org.springframework.data.mongodb.repository.MongoRepository;
 
 public interface DriverRepository extends MongoRepository<Driver, String> {
 }
+========================================================================
 FILE: driverService\src\main\java\com\flashCab\driverService\service\DriverService.java
 ========================================================================
 package com.flashCab.driverService.service;
@@ -1126,6 +1204,7 @@ public class DriverService {
         return driverId;
     }
 }
+========================================================================
 FILE: driverService\src\main\resources\application.yaml
 ========================================================================
 spring:
@@ -1146,6 +1225,7 @@ management:
     web:
       exposure:
         include: health, info
+========================================================================
 FILE: driverService\src\test\java\com\flashCab\driverService\DriverServiceApplicationTests.java
 ========================================================================
 package com.flashCab.driverService;
@@ -1161,6 +1241,7 @@ class DriverServiceApplicationTests {
 	}
 
 }
+========================================================================
 FILE: FlashCabPostmanCollection.json
 ========================================================================
 {
@@ -1336,22 +1417,6 @@ FILE: FlashCabPostmanCollection.json
               }
             }
           ]
-        },
-        {
-          "name": "5 - Health",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": "{{locationBaseUrl}}/actuator/health"
-          }
-        },
-        {
-          "name": "6 - Info",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": "{{locationBaseUrl}}/actuator/info"
-          }
         }
       ]
     },
@@ -1506,46 +1571,13 @@ FILE: FlashCabPostmanCollection.json
               }
             }
           ]
-        },
-        {
-          "name": "7 - Health",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": "{{rideBaseUrl}}/actuator/health"
-          }
-        },
-        {
-          "name": "8 - Info",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": "{{rideBaseUrl}}/actuator/info"
-          }
         }
       ]
     },
     {
       "name": "Matching Service",
       "description": "Matching Service has no business REST controller; ride matching is triggered by Kafka events. Only its configured Actuator endpoints are callable over HTTP.",
-      "item": [
-        {
-          "name": "1 - Health",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": "http://localhost:8084/actuator/health"
-          }
-        },
-        {
-          "name": "2 - Info",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": "http://localhost:8084/actuator/info"
-          }
-        }
-      ]
+      "item": []
     },
     {
       "name": "Driver Service",
@@ -1683,48 +1715,6 @@ FILE: FlashCabPostmanCollection.json
                 "type": "text/javascript",
                 "exec": [
                   "pm.test('Status is 204 No Content', function () { pm.response.to.have.status(204); });"
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "name": "6 - Health",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": "{{driverBaseUrl}}/actuator/health",
-            "description": "Driver Service Actuator health endpoint."
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test('Status is 200', function () { pm.response.to.have.status(200); });",
-                  "pm.test('Response is JSON', function () { pm.response.to.be.json; });"
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "name": "7 - Info",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": "{{driverBaseUrl}}/actuator/info",
-            "description": "Driver Service Actuator info endpoint."
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test('Status is 200', function () { pm.response.to.have.status(200); });",
-                  "pm.test('Response is JSON', function () { pm.response.to.be.json; });"
                 ]
               }
             }
@@ -1878,57 +1868,740 @@ FILE: FlashCabPostmanCollection.json
               }
             }
           ]
-        },
-        {
-          "name": "6 - Health",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": "{{riderBaseUrl}}/actuator/health",
-            "description": "Rider Service Actuator health endpoint."
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test('Status is 200', function () { pm.response.to.have.status(200); });",
-                  "pm.test('Response is JSON', function () { pm.response.to.be.json; });"
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "name": "7 - Info",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": "{{riderBaseUrl}}/actuator/info",
-            "description": "Rider Service Actuator info endpoint."
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test('Status is 200', function () { pm.response.to.have.status(200); });",
-                  "pm.test('Response is JSON', function () { pm.response.to.be.json; });"
-                ]
-              }
-            }
-          ]
         }
       ]
     }
   ]
 }
+========================================================================
+FILE: gatewayService\.gitattributes
+========================================================================
+/mvnw text eol=lf
+*.cmd text eol=crlf
+========================================================================
+FILE: gatewayService\.gitignore
+========================================================================
+HELP.md
+target/
+.mvn/wrapper/maven-wrapper.jar
+!**/src/main/**/target/
+!**/src/test/**/target/
+
+### STS ###
+.apt_generated
+.classpath
+.factorypath
+.project
+.settings
+.springBeans
+.sts4-cache
+
+### IntelliJ IDEA ###
+.idea
+*.iws
+*.iml
+*.ipr
+
+### NetBeans ###
+/nbproject/private/
+/nbbuild/
+/dist/
+/nbdist/
+/.nb-gradle/
+build/
+!**/src/main/**/build/
+!**/src/test/**/build/
+
+### VS Code ###
+.vscode/
+========================================================================
+FILE: gatewayService\HELP.md
+========================================================================
+# Getting Started
+
+### Reference Documentation
+For further reference, please consider the following sections:
+
+* [Official Apache Maven documentation](https://maven.apache.org/guides/index.html)
+* [Spring Boot Maven Plugin Reference Guide](https://docs.spring.io/spring-boot/4.1.2/maven-plugin)
+* [Create an OCI image](https://docs.spring.io/spring-boot/4.1.2/maven-plugin/build-image.html)
+
+### Maven Parent overrides
+
+Due to Maven's design, elements are inherited from the parent POM to the project POM.
+While most of the inheritance is fine, it also inherits unwanted elements like `<license>` and `<developers>` from the parent.
+To prevent this, the project POM contains empty overrides for these elements.
+If you manually switch to a different parent and actually want the inheritance, you need to remove those overrides.
+
+========================================================================
+FILE: gatewayService\mvnw
+========================================================================
+#!/bin/sh
+# ----------------------------------------------------------------------------
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#    http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+# ----------------------------------------------------------------------------
+
+# ----------------------------------------------------------------------------
+# Apache Maven Wrapper startup batch script, version 3.3.4
+#
+# Optional ENV vars
+# -----------------
+#   JAVA_HOME - location of a JDK home dir, required when download maven via java source
+#   MVNW_REPOURL - repo url base for downloading maven distribution
+#   MVNW_USERNAME/MVNW_PASSWORD - user and password for downloading maven
+#   MVNW_VERBOSE - true: enable verbose log; debug: trace the mvnw script; others: silence the output
+# ----------------------------------------------------------------------------
+
+set -euf
+[ "${MVNW_VERBOSE-}" != debug ] || set -x
+
+# OS specific support.
+native_path() { printf %s\\n "$1"; }
+case "$(uname)" in
+CYGWIN* | MINGW*)
+  [ -z "${JAVA_HOME-}" ] || JAVA_HOME="$(cygpath --unix "$JAVA_HOME")"
+  native_path() { cygpath --path --windows "$1"; }
+  ;;
+esac
+
+# set JAVACMD and JAVACCMD
+set_java_home() {
+  # For Cygwin and MinGW, ensure paths are in Unix format before anything is touched
+  if [ -n "${JAVA_HOME-}" ]; then
+    if [ -x "$JAVA_HOME/jre/sh/java" ]; then
+      # IBM's JDK on AIX uses strange locations for the executables
+      JAVACMD="$JAVA_HOME/jre/sh/java"
+      JAVACCMD="$JAVA_HOME/jre/sh/javac"
+    else
+      JAVACMD="$JAVA_HOME/bin/java"
+      JAVACCMD="$JAVA_HOME/bin/javac"
+
+      if [ ! -x "$JAVACMD" ] || [ ! -x "$JAVACCMD" ]; then
+        echo "The JAVA_HOME environment variable is not defined correctly, so mvnw cannot run." >&2
+        echo "JAVA_HOME is set to \"$JAVA_HOME\", but \"\$JAVA_HOME/bin/java\" or \"\$JAVA_HOME/bin/javac\" does not exist." >&2
+        return 1
+      fi
+    fi
+  else
+    JAVACMD="$(
+      'set' +e
+      'unset' -f command 2>/dev/null
+      'command' -v java
+    )" || :
+    JAVACCMD="$(
+      'set' +e
+      'unset' -f command 2>/dev/null
+      'command' -v javac
+    )" || :
+
+    if [ ! -x "${JAVACMD-}" ] || [ ! -x "${JAVACCMD-}" ]; then
+      echo "The java/javac command does not exist in PATH nor is JAVA_HOME set, so mvnw cannot run." >&2
+      return 1
+    fi
+  fi
+}
+
+# hash string like Java String::hashCode
+hash_string() {
+  str="${1:-}" h=0
+  while [ -n "$str" ]; do
+    char="${str%"${str#?}"}"
+    h=$(((h * 31 + $(LC_CTYPE=C printf %d "'$char")) % 4294967296))
+    str="${str#?}"
+  done
+  printf %x\\n $h
+}
+
+verbose() { :; }
+[ "${MVNW_VERBOSE-}" != true ] || verbose() { printf %s\\n "${1-}"; }
+
+die() {
+  printf %s\\n "$1" >&2
+  exit 1
+}
+
+trim() {
+  # MWRAPPER-139:
+  #   Trims trailing and leading whitespace, carriage returns, tabs, and linefeeds.
+  #   Needed for removing poorly interpreted newline sequences when running in more
+  #   exotic environments such as mingw bash on Windows.
+  printf "%s" "${1}" | tr -d '[:space:]'
+}
+
+scriptDir="$(dirname "$0")"
+scriptName="$(basename "$0")"
+
+# parse distributionUrl and optional distributionSha256Sum, requires .mvn/wrapper/maven-wrapper.properties
+while IFS="=" read -r key value; do
+  case "${key-}" in
+  distributionUrl) distributionUrl=$(trim "${value-}") ;;
+  distributionSha256Sum) distributionSha256Sum=$(trim "${value-}") ;;
+  esac
+done <"$scriptDir/.mvn/wrapper/maven-wrapper.properties"
+[ -n "${distributionUrl-}" ] || die "cannot read distributionUrl property in $scriptDir/.mvn/wrapper/maven-wrapper.properties"
+
+case "${distributionUrl##*/}" in
+maven-mvnd-*bin.*)
+  MVN_CMD=mvnd.sh _MVNW_REPO_PATTERN=/maven/mvnd/
+  case "${PROCESSOR_ARCHITECTURE-}${PROCESSOR_ARCHITEW6432-}:$(uname -a)" in
+  *AMD64:CYGWIN* | *AMD64:MINGW*) distributionPlatform=windows-amd64 ;;
+  :Darwin*x86_64) distributionPlatform=darwin-amd64 ;;
+  :Darwin*arm64) distributionPlatform=darwin-aarch64 ;;
+  :Linux*x86_64*) distributionPlatform=linux-amd64 ;;
+  *)
+    echo "Cannot detect native platform for mvnd on $(uname)-$(uname -m), use pure java version" >&2
+    distributionPlatform=linux-amd64
+    ;;
+  esac
+  distributionUrl="${distributionUrl%-bin.*}-$distributionPlatform.zip"
+  ;;
+maven-mvnd-*) MVN_CMD=mvnd.sh _MVNW_REPO_PATTERN=/maven/mvnd/ ;;
+*) MVN_CMD="mvn${scriptName#mvnw}" _MVNW_REPO_PATTERN=/org/apache/maven/ ;;
+esac
+
+# apply MVNW_REPOURL and calculate MAVEN_HOME
+# maven home pattern: ~/.m2/wrapper/dists/{apache-maven-<version>,maven-mvnd-<version>-<platform>}/<hash>
+[ -z "${MVNW_REPOURL-}" ] || distributionUrl="$MVNW_REPOURL$_MVNW_REPO_PATTERN${distributionUrl#*"$_MVNW_REPO_PATTERN"}"
+distributionUrlName="${distributionUrl##*/}"
+distributionUrlNameMain="${distributionUrlName%.*}"
+distributionUrlNameMain="${distributionUrlNameMain%-bin}"
+MAVEN_USER_HOME="${MAVEN_USER_HOME:-${HOME}/.m2}"
+MAVEN_HOME="${MAVEN_USER_HOME}/wrapper/dists/${distributionUrlNameMain-}/$(hash_string "$distributionUrl")"
+
+exec_maven() {
+  unset MVNW_VERBOSE MVNW_USERNAME MVNW_PASSWORD MVNW_REPOURL || :
+  exec "$MAVEN_HOME/bin/$MVN_CMD" "$@" || die "cannot exec $MAVEN_HOME/bin/$MVN_CMD"
+}
+
+if [ -d "$MAVEN_HOME" ]; then
+  verbose "found existing MAVEN_HOME at $MAVEN_HOME"
+  exec_maven "$@"
+fi
+
+case "${distributionUrl-}" in
+*?-bin.zip | *?maven-mvnd-?*-?*.zip) ;;
+*) die "distributionUrl is not valid, must match *-bin.zip or maven-mvnd-*.zip, but found '${distributionUrl-}'" ;;
+esac
+
+# prepare tmp dir
+if TMP_DOWNLOAD_DIR="$(mktemp -d)" && [ -d "$TMP_DOWNLOAD_DIR" ]; then
+  clean() { rm -rf -- "$TMP_DOWNLOAD_DIR"; }
+  trap clean HUP INT TERM EXIT
+else
+  die "cannot create temp dir"
+fi
+
+mkdir -p -- "${MAVEN_HOME%/*}"
+
+# Download and Install Apache Maven
+verbose "Couldn't find MAVEN_HOME, downloading and installing it ..."
+verbose "Downloading from: $distributionUrl"
+verbose "Downloading to: $TMP_DOWNLOAD_DIR/$distributionUrlName"
+
+# select .zip or .tar.gz
+if ! command -v unzip >/dev/null; then
+  distributionUrl="${distributionUrl%.zip}.tar.gz"
+  distributionUrlName="${distributionUrl##*/}"
+fi
+
+# verbose opt
+__MVNW_QUIET_WGET=--quiet __MVNW_QUIET_CURL=--silent __MVNW_QUIET_UNZIP=-q __MVNW_QUIET_TAR=''
+[ "${MVNW_VERBOSE-}" != true ] || __MVNW_QUIET_WGET='' __MVNW_QUIET_CURL='' __MVNW_QUIET_UNZIP='' __MVNW_QUIET_TAR=v
+
+# normalize http auth
+case "${MVNW_PASSWORD=<REDACTED> in
+'') MVNW_USERNAME='' MVNW_PASSWORD='' ;;
+has-password) [ -n "${MVNW_USERNAME-}" ] || MVNW_USERNAME='' MVNW_PASSWORD='' ;;
+esac
+
+if [ -z "${MVNW_USERNAME-}" ] && command -v wget >/dev/null; then
+  verbose "Found wget ... using wget"
+  wget ${__MVNW_QUIET_WGET:+"$__MVNW_QUIET_WGET"} "$distributionUrl" -O "$TMP_DOWNLOAD_DIR/$distributionUrlName" || die "wget: Failed to fetch $distributionUrl"
+elif [ -z "${MVNW_USERNAME-}" ] && command -v curl >/dev/null; then
+  verbose "Found curl ... using curl"
+  curl ${__MVNW_QUIET_CURL:+"$__MVNW_QUIET_CURL"} -f -L -o "$TMP_DOWNLOAD_DIR/$distributionUrlName" "$distributionUrl" || die "curl: Failed to fetch $distributionUrl"
+elif set_java_home; then
+  verbose "Falling back to use Java to download"
+  javaSource="$TMP_DOWNLOAD_DIR/Downloader.java"
+  targetZip="$TMP_DOWNLOAD_DIR/$distributionUrlName"
+  cat >"$javaSource" <<-END
+	public class Downloader extends java.net.Authenticator
+	{
+	  protected java.net.PasswordAuthentication getPasswordAuthentication()
+	  {
+	    return new java.net.PasswordAuthentication( System.getenv( "MVNW_USERNAME" ), System.getenv( "MVNW_PASSWORD" ).toCharArray() );
+	  }
+	  public static void main( String[] args ) throws Exception
+	  {
+	    setDefault( new Downloader() );
+	    java.nio.file.Files.copy( java.net.URI.create( args[0] ).toURL().openStream(), java.nio.file.Paths.get( args[1] ).toAbsolutePath().normalize() );
+	  }
+	}
+	END
+  # For Cygwin/MinGW, switch paths to Windows format before running javac and java
+  verbose " - Compiling Downloader.java ..."
+  "$(native_path "$JAVACCMD")" "$(native_path "$javaSource")" || die "Failed to compile Downloader.java"
+  verbose " - Running Downloader.java ..."
+  "$(native_path "$JAVACMD")" -cp "$(native_path "$TMP_DOWNLOAD_DIR")" Downloader "$distributionUrl" "$(native_path "$targetZip")"
+fi
+
+# If specified, validate the SHA-256 sum of the Maven distribution zip file
+if [ -n "${distributionSha256Sum-}" ]; then
+  distributionSha256Result=false
+  if [ "$MVN_CMD" = mvnd.sh ]; then
+    echo "Checksum validation is not supported for maven-mvnd." >&2
+    echo "Please disable validation by removing 'distributionSha256Sum' from your maven-wrapper.properties." >&2
+    exit 1
+  elif command -v sha256sum >/dev/null; then
+    if echo "$distributionSha256Sum  $TMP_DOWNLOAD_DIR/$distributionUrlName" | sha256sum -c - >/dev/null 2>&1; then
+      distributionSha256Result=true
+    fi
+  elif command -v shasum >/dev/null; then
+    if echo "$distributionSha256Sum  $TMP_DOWNLOAD_DIR/$distributionUrlName" | shasum -a 256 -c >/dev/null 2>&1; then
+      distributionSha256Result=true
+    fi
+  else
+    echo "Checksum validation was requested but neither 'sha256sum' or 'shasum' are available." >&2
+    echo "Please install either command, or disable validation by removing 'distributionSha256Sum' from your maven-wrapper.properties." >&2
+    exit 1
+  fi
+  if [ $distributionSha256Result = false ]; then
+    echo "Error: Failed to validate Maven distribution SHA-256, your Maven distribution might be compromised." >&2
+    echo "If you updated your Maven version, you need to update the specified distributionSha256Sum property." >&2
+    exit 1
+  fi
+fi
+
+# unzip and move
+if command -v unzip >/dev/null; then
+  unzip ${__MVNW_QUIET_UNZIP:+"$__MVNW_QUIET_UNZIP"} "$TMP_DOWNLOAD_DIR/$distributionUrlName" -d "$TMP_DOWNLOAD_DIR" || die "failed to unzip"
+else
+  tar xzf${__MVNW_QUIET_TAR:+"$__MVNW_QUIET_TAR"} "$TMP_DOWNLOAD_DIR/$distributionUrlName" -C "$TMP_DOWNLOAD_DIR" || die "failed to untar"
+fi
+
+# Find the actual extracted directory name (handles snapshots where filename != directory name)
+actualDistributionDir=""
+
+# First try the expected directory name (for regular distributions)
+if [ -d "$TMP_DOWNLOAD_DIR/$distributionUrlNameMain" ]; then
+  if [ -f "$TMP_DOWNLOAD_DIR/$distributionUrlNameMain/bin/$MVN_CMD" ]; then
+    actualDistributionDir="$distributionUrlNameMain"
+  fi
+fi
+
+# If not found, search for any directory with the Maven executable (for snapshots)
+if [ -z "$actualDistributionDir" ]; then
+  # enable globbing to iterate over items
+  set +f
+  for dir in "$TMP_DOWNLOAD_DIR"/*; do
+    if [ -d "$dir" ]; then
+      if [ -f "$dir/bin/$MVN_CMD" ]; then
+        actualDistributionDir="$(basename "$dir")"
+        break
+      fi
+    fi
+  done
+  set -f
+fi
+
+if [ -z "$actualDistributionDir" ]; then
+  verbose "Contents of $TMP_DOWNLOAD_DIR:"
+  verbose "$(ls -la "$TMP_DOWNLOAD_DIR")"
+  die "Could not find Maven distribution directory in extracted archive"
+fi
+
+verbose "Found extracted Maven distribution directory: $actualDistributionDir"
+printf %s\\n "$distributionUrl" >"$TMP_DOWNLOAD_DIR/$actualDistributionDir/mvnw.url"
+mv -- "$TMP_DOWNLOAD_DIR/$actualDistributionDir" "$MAVEN_HOME" || [ -d "$MAVEN_HOME" ] || die "fail to move MAVEN_HOME"
+
+clean || :
+exec_maven "$@"
+========================================================================
+FILE: gatewayService\mvnw.cmd
+========================================================================
+<# : batch portion
+@REM ----------------------------------------------------------------------------
+@REM Licensed to the Apache Software Foundation (ASF) under one
+@REM or more contributor license agreements.  See the NOTICE file
+@REM distributed with this work for additional information
+@REM regarding copyright ownership.  The ASF licenses this file
+@REM to you under the Apache License, Version 2.0 (the
+@REM "License"); you may not use this file except in compliance
+@REM with the License.  You may obtain a copy of the License at
+@REM
+@REM    http://www.apache.org/licenses/LICENSE-2.0
+@REM
+@REM Unless required by applicable law or agreed to in writing,
+@REM software distributed under the License is distributed on an
+@REM "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+@REM KIND, either express or implied.  See the License for the
+@REM specific language governing permissions and limitations
+@REM under the License.
+@REM ----------------------------------------------------------------------------
+
+@REM ----------------------------------------------------------------------------
+@REM Apache Maven Wrapper startup batch script, version 3.3.4
+@REM
+@REM Optional ENV vars
+@REM   MVNW_REPOURL - repo url base for downloading maven distribution
+@REM   MVNW_USERNAME/MVNW_PASSWORD - user and password for downloading maven
+@REM   MVNW_VERBOSE - true: enable verbose log; others: silence the output
+@REM ----------------------------------------------------------------------------
+
+@IF "%__MVNW_ARG0_NAME__%"=="" (SET __MVNW_ARG0_NAME__=%~nx0)
+@SET __MVNW_CMD__=
+@SET __MVNW_ERROR__=
+@SET __MVNW_PSMODULEP_SAVE=%PSModulePath%
+@SET PSModulePath=
+@FOR /F "usebackq tokens=1* delims==" %%A IN (`powershell -noprofile "& {$scriptDir='%~dp0'; $script='%__MVNW_ARG0_NAME__%'; icm -ScriptBlock ([Scriptblock]::Create((Get-Content -Raw '%~f0'))) -NoNewScope}"`) DO @(
+  IF "%%A"=="MVN_CMD" (set __MVNW_CMD__=%%B) ELSE IF "%%B"=="" (echo %%A) ELSE (echo %%A=%%B)
+)
+@SET PSModulePath=%__MVNW_PSMODULEP_SAVE%
+@SET __MVNW_PSMODULEP_SAVE=
+@SET __MVNW_ARG0_NAME__=
+@SET MVNW_USERNAME=
+@SET MVNW_PASSWORD=<REDACTED> NOT "%__MVNW_CMD__%"=="" ("%__MVNW_CMD__%" %*)
+@echo Cannot start maven from wrapper >&2 && exit /b 1
+@GOTO :EOF
+: end batch / begin powershell #>
+
+$ErrorActionPreference = "Stop"
+if ($env:MVNW_VERBOSE -eq "true") {
+  $VerbosePreference = "Continue"
+}
+
+# calculate distributionUrl, requires .mvn/wrapper/maven-wrapper.properties
+$distributionUrl = (Get-Content -Raw "$scriptDir/.mvn/wrapper/maven-wrapper.properties" | ConvertFrom-StringData).distributionUrl
+if (!$distributionUrl) {
+  Write-Error "cannot read distributionUrl property in $scriptDir/.mvn/wrapper/maven-wrapper.properties"
+}
+
+switch -wildcard -casesensitive ( $($distributionUrl -replace '^.*/','') ) {
+  "maven-mvnd-*" {
+    $USE_MVND = $true
+    $distributionUrl = $distributionUrl -replace '-bin\.[^.]*$',"-windows-amd64.zip"
+    $MVN_CMD = "mvnd.cmd"
+    break
+  }
+  default {
+    $USE_MVND = $false
+    $MVN_CMD = $script -replace '^mvnw','mvn'
+    break
+  }
+}
+
+# apply MVNW_REPOURL and calculate MAVEN_HOME
+# maven home pattern: ~/.m2/wrapper/dists/{apache-maven-<version>,maven-mvnd-<version>-<platform>}/<hash>
+if ($env:MVNW_REPOURL) {
+  $MVNW_REPO_PATTERN = if ($USE_MVND -eq $False) { "/org/apache/maven/" } else { "/maven/mvnd/" }
+  $distributionUrl = "$env:MVNW_REPOURL$MVNW_REPO_PATTERN$($distributionUrl -replace "^.*$MVNW_REPO_PATTERN",'')"
+}
+$distributionUrlName = $distributionUrl -replace '^.*/',''
+$distributionUrlNameMain = $distributionUrlName -replace '\.[^.]*$','' -replace '-bin$',''
+
+$MAVEN_M2_PATH = "$HOME/.m2"
+if ($env:MAVEN_USER_HOME) {
+  $MAVEN_M2_PATH = "$env:MAVEN_USER_HOME"
+}
+
+if (-not (Test-Path -Path $MAVEN_M2_PATH)) {
+    New-Item -Path $MAVEN_M2_PATH -ItemType Directory | Out-Null
+}
+
+$MAVEN_WRAPPER_DISTS = $null
+if ((Get-Item $MAVEN_M2_PATH).Target[0] -eq $null) {
+  $MAVEN_WRAPPER_DISTS = "$MAVEN_M2_PATH/wrapper/dists"
+} else {
+  $MAVEN_WRAPPER_DISTS = (Get-Item $MAVEN_M2_PATH).Target[0] + "/wrapper/dists"
+}
+
+$MAVEN_HOME_PARENT = "$MAVEN_WRAPPER_DISTS/$distributionUrlNameMain"
+$MAVEN_HOME_NAME = ([System.Security.Cryptography.SHA256]::Create().ComputeHash([byte[]][char[]]$distributionUrl) | ForEach-Object {$_.ToString("x2")}) -join ''
+$MAVEN_HOME = "$MAVEN_HOME_PARENT/$MAVEN_HOME_NAME"
+
+if (Test-Path -Path "$MAVEN_HOME" -PathType Container) {
+  Write-Verbose "found existing MAVEN_HOME at $MAVEN_HOME"
+  Write-Output "MVN_CMD=$MAVEN_HOME/bin/$MVN_CMD"
+  exit $?
+}
+
+if (! $distributionUrlNameMain -or ($distributionUrlName -eq $distributionUrlNameMain)) {
+  Write-Error "distributionUrl is not valid, must end with *-bin.zip, but found $distributionUrl"
+}
+
+# prepare tmp dir
+$TMP_DOWNLOAD_DIR_HOLDER = New-TemporaryFile
+$TMP_DOWNLOAD_DIR = New-Item -Itemtype Directory -Path "$TMP_DOWNLOAD_DIR_HOLDER.dir"
+$TMP_DOWNLOAD_DIR_HOLDER.Delete() | Out-Null
+trap {
+  if ($TMP_DOWNLOAD_DIR.Exists) {
+    try { Remove-Item $TMP_DOWNLOAD_DIR -Recurse -Force | Out-Null }
+    catch { Write-Warning "Cannot remove $TMP_DOWNLOAD_DIR" }
+  }
+}
+
+New-Item -Itemtype Directory -Path "$MAVEN_HOME_PARENT" -Force | Out-Null
+
+# Download and Install Apache Maven
+Write-Verbose "Couldn't find MAVEN_HOME, downloading and installing it ..."
+Write-Verbose "Downloading from: $distributionUrl"
+Write-Verbose "Downloading to: $TMP_DOWNLOAD_DIR/$distributionUrlName"
+
+$webclient = New-Object System.Net.WebClient
+if ($env:MVNW_USERNAME -and $env:MVNW_PASSWORD) {
+  $webclient.Credentials = New-Object System.Net.NetworkCredential($env:MVNW_USERNAME, $env:MVNW_PASSWORD)
+}
+[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+$webclient.DownloadFile($distributionUrl, "$TMP_DOWNLOAD_DIR/$distributionUrlName") | Out-Null
+
+# If specified, validate the SHA-256 sum of the Maven distribution zip file
+$distributionSha256Sum = (Get-Content -Raw "$scriptDir/.mvn/wrapper/maven-wrapper.properties" | ConvertFrom-StringData).distributionSha256Sum
+if ($distributionSha256Sum) {
+  if ($USE_MVND) {
+    Write-Error "Checksum validation is not supported for maven-mvnd. `nPlease disable validation by removing 'distributionSha256Sum' from your maven-wrapper.properties."
+  }
+  Import-Module $PSHOME\Modules\Microsoft.PowerShell.Utility -Function Get-FileHash
+  if ((Get-FileHash "$TMP_DOWNLOAD_DIR/$distributionUrlName" -Algorithm SHA256).Hash.ToLower() -ne $distributionSha256Sum) {
+    Write-Error "Error: Failed to validate Maven distribution SHA-256, your Maven distribution might be compromised. If you updated your Maven version, you need to update the specified distributionSha256Sum property."
+  }
+}
+
+# unzip and move
+Expand-Archive "$TMP_DOWNLOAD_DIR/$distributionUrlName" -DestinationPath "$TMP_DOWNLOAD_DIR" | Out-Null
+
+# Find the actual extracted directory name (handles snapshots where filename != directory name)
+$actualDistributionDir = ""
+
+# First try the expected directory name (for regular distributions)
+$expectedPath = Join-Path "$TMP_DOWNLOAD_DIR" "$distributionUrlNameMain"
+$expectedMvnPath = Join-Path "$expectedPath" "bin/$MVN_CMD"
+if ((Test-Path -Path $expectedPath -PathType Container) -and (Test-Path -Path $expectedMvnPath -PathType Leaf)) {
+  $actualDistributionDir = $distributionUrlNameMain
+}
+
+# If not found, search for any directory with the Maven executable (for snapshots)
+if (!$actualDistributionDir) {
+  Get-ChildItem -Path "$TMP_DOWNLOAD_DIR" -Directory | ForEach-Object {
+    $testPath = Join-Path $_.FullName "bin/$MVN_CMD"
+    if (Test-Path -Path $testPath -PathType Leaf) {
+      $actualDistributionDir = $_.Name
+    }
+  }
+}
+
+if (!$actualDistributionDir) {
+  Write-Error "Could not find Maven distribution directory in extracted archive"
+}
+
+Write-Verbose "Found extracted Maven distribution directory: $actualDistributionDir"
+Rename-Item -Path "$TMP_DOWNLOAD_DIR/$actualDistributionDir" -NewName $MAVEN_HOME_NAME | Out-Null
+try {
+  Move-Item -Path "$TMP_DOWNLOAD_DIR/$MAVEN_HOME_NAME" -Destination $MAVEN_HOME_PARENT | Out-Null
+} catch {
+  if (! (Test-Path -Path "$MAVEN_HOME" -PathType Container)) {
+    Write-Error "fail to move MAVEN_HOME"
+  }
+} finally {
+  try { Remove-Item $TMP_DOWNLOAD_DIR -Recurse -Force | Out-Null }
+  catch { Write-Warning "Cannot remove $TMP_DOWNLOAD_DIR" }
+}
+
+Write-Output "MVN_CMD=$MAVEN_HOME/bin/$MVN_CMD"
+========================================================================
+FILE: gatewayService\pom.xml
+========================================================================
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+	<modelVersion>4.0.0</modelVersion>
+	<parent>
+		<groupId>org.springframework.boot</groupId>
+		<artifactId>spring-boot-starter-parent</artifactId>
+		<version>4.1.2</version>
+		<relativePath/> <!-- lookup parent from repository -->
+	</parent>
+	<groupId>com.flashcab.gatewayService</groupId>
+	<artifactId>gatewayService</artifactId>
+	<version>0.0.1-SNAPSHOT</version>
+	<name/>
+	<description/>
+	<url/>
+	<licenses>
+		<license/>
+	</licenses>
+	<developers>
+		<developer/>
+	</developers>
+	<scm>
+		<connection/>
+		<developerConnection/>
+		<tag/>
+		<url/>
+	</scm>
+	<properties>
+		<java.version>17</java.version>
+		<spring-cloud.version>2025.1.4</spring-cloud.version>
+		<springdoc.version>3.0.0</springdoc.version>
+	</properties>
+	<dependencies>
+		<dependency>
+			<groupId>org.springframework.cloud</groupId>
+			<artifactId>spring-cloud-starter-gateway-server-webflux</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.springdoc</groupId>
+			<artifactId>springdoc-openapi-starter-webflux-ui</artifactId>
+			<version>${springdoc.version}</version>
+		</dependency>
+
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-test</artifactId>
+			<scope>test</scope>
+		</dependency>
+	</dependencies>
+
+	<dependencyManagement>
+		<dependencies>
+			<dependency>
+				<groupId>org.springframework.cloud</groupId>
+				<artifactId>spring-cloud-dependencies</artifactId>
+				<version>${spring-cloud.version}</version>
+				<type>pom</type>
+				<scope>import</scope>
+			</dependency>
+		</dependencies>
+	</dependencyManagement>
+
+	<build>
+		<plugins>
+			<plugin>
+				<groupId>org.springframework.boot</groupId>
+				<artifactId>spring-boot-maven-plugin</artifactId>
+			</plugin>
+		</plugins>
+	</build>
+
+</project>
+========================================================================
+FILE: gatewayService\src\main\java\com\flashcab\gatewayService\gatewayService\GatewayServiceApplication.java
+========================================================================
+package com.flashcab.gatewayService.gatewayService;
+
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+
+@SpringBootApplication
+public class GatewayServiceApplication {
+
+	public static void main(String[] args) {
+		SpringApplication.run(GatewayServiceApplication.class, args);
+	}
+
+}
+========================================================================
+FILE: gatewayService\src\main\resources\application.yaml
+========================================================================
+spring:
+  application:
+    name: gatewayService
+  cloud:
+    gateway:
+      server:
+        webflux:
+          routes:
+            - id: riders
+              uri: http://localhost:8086
+              predicates:
+                - Path=/api/v1/riders/**
+            - id: drivers
+              uri: http://localhost:8085
+              predicates:
+                - Path=/api/v1/drivers/**
+            - id: locations
+              uri: http://localhost:8082
+              predicates:
+                - Path=/api/v1/locations/**
+            - id: rides
+              uri: http://localhost:8083
+              predicates:
+                - Path=/api/v1/rides/**
+            - id: rider-openapi
+              uri: http://localhost:8086
+              predicates:
+                - Path=/rider-service/v3/api-docs/**
+              filters:
+                - StripPrefix=1
+            - id: driver-openapi
+              uri: http://localhost:8085
+              predicates:
+                - Path=/driver-service/v3/api-docs/**
+              filters:
+                - StripPrefix=1
+            - id: location-openapi
+              uri: http://localhost:8082
+              predicates:
+                - Path=/location-service/v3/api-docs/**
+              filters:
+                - StripPrefix=1
+            - id: ride-openapi
+              uri: http://localhost:8083
+              predicates:
+                - Path=/ride-service/v3/api-docs/**
+              filters:
+                - StripPrefix=1
+
+springdoc:
+  swagger-ui:
+    urls:
+      - name: Rider Service
+        url: /rider-service/v3/api-docs
+      - name: Driver Service
+        url: /driver-service/v3/api-docs
+      - name: Location Service
+        url: /location-service/v3/api-docs
+      - name: Ride Service
+        url: /ride-service/v3/api-docs
+
+server:
+  port: 8081
+========================================================================
+FILE: gatewayService\src\test\java\com\flashcab\gatewayService\gatewayService\GatewayServiceApplicationTests.java
+========================================================================
+package com.flashcab.gatewayService.gatewayService;
+
+import org.junit.jupiter.api.Test;
+import org.springframework.boot.test.context.SpringBootTest;
+
+@SpringBootTest
+class GatewayServiceApplicationTests {
+
+	@Test
+	void contextLoads() {
+	}
+
+}
+========================================================================
 FILE: locationService\.gitattributes
 ========================================================================
 /mvnw text eol=lf
 *.cmd text eol=crlf
+========================================================================
 FILE: locationService\.gitignore
 ========================================================================
 HELP.md
@@ -1964,11 +2637,7 @@ build/
 
 ### VS Code ###
 .vscode/
-FILE: locationService\.mvn\wrapper\maven-wrapper.properties
 ========================================================================
-wrapperVersion=3.3.4
-distributionType=only-script
-distributionUrl=https://repo.maven.apache.org/maven2/org/apache/maven/apache-maven/3.10.0/apache-maven-3.10.0-bin.zip
 FILE: locationService\HELP.md
 ========================================================================
 # Getting Started
@@ -1999,6 +2668,7 @@ While most of the inheritance is fine, it also inherits unwanted elements like `
 To prevent this, the project POM contains empty overrides for these elements.
 If you manually switch to a different parent and actually want the inheritance, you need to remove those overrides.
 
+========================================================================
 FILE: locationService\mvnw
 ========================================================================
 #!/bin/sh
@@ -2189,7 +2859,7 @@ __MVNW_QUIET_WGET=--quiet __MVNW_QUIET_CURL=--silent __MVNW_QUIET_UNZIP=-q __MVN
 [ "${MVNW_VERBOSE-}" != true ] || __MVNW_QUIET_WGET='' __MVNW_QUIET_CURL='' __MVNW_QUIET_UNZIP='' __MVNW_QUIET_TAR=v
 
 # normalize http auth
-case "${MVNW_PASSWORD:+has-password}" in
+case "${MVNW_PASSWORD=<REDACTED> in
 '') MVNW_USERNAME='' MVNW_PASSWORD='' ;;
 has-password) [ -n "${MVNW_USERNAME-}" ] || MVNW_USERNAME='' MVNW_PASSWORD='' ;;
 esac
@@ -2296,6 +2966,7 @@ mv -- "$TMP_DOWNLOAD_DIR/$actualDistributionDir" "$MAVEN_HOME" || [ -d "$MAVEN_H
 
 clean || :
 exec_maven "$@"
+========================================================================
 FILE: locationService\mvnw.cmd
 ========================================================================
 <# : batch portion
@@ -2339,8 +3010,7 @@ FILE: locationService\mvnw.cmd
 @SET __MVNW_PSMODULEP_SAVE=
 @SET __MVNW_ARG0_NAME__=
 @SET MVNW_USERNAME=
-@SET MVNW_PASSWORD=
-@IF NOT "%__MVNW_CMD__%"=="" ("%__MVNW_CMD__%" %*)
+@SET MVNW_PASSWORD=<REDACTED> NOT "%__MVNW_CMD__%"=="" ("%__MVNW_CMD__%" %*)
 @echo Cannot start maven from wrapper >&2 && exit /b 1
 @GOTO :EOF
 : end batch / begin powershell #>
@@ -2487,6 +3157,7 @@ try {
 }
 
 Write-Output "MVN_CMD=$MAVEN_HOME/bin/$MVN_CMD"
+========================================================================
 FILE: locationService\pom.xml
 ========================================================================
 <?xml version="1.0" encoding="UTF-8"?>
@@ -2520,6 +3191,7 @@ FILE: locationService\pom.xml
 	<properties>
 		<java.version>17</java.version>
 		<spring-cloud.version>2025.1.4</spring-cloud.version>
+		<springdoc.version>3.0.0</springdoc.version>
 	</properties>
 	<dependencies>
 		<dependency>
@@ -2533,6 +3205,11 @@ FILE: locationService\pom.xml
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-webmvc</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.springdoc</groupId>
+			<artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+			<version>${springdoc.version}</version>
 		</dependency>
 		<dependency>
 			<groupId>org.springframework.cloud</groupId>
@@ -2619,6 +3296,7 @@ FILE: locationService\pom.xml
 	</build>
 
 </project>
+========================================================================
 FILE: locationService\src\main\java\com\flashCab\driverService\dto\DriverResponse.java
 ========================================================================
 package com.flashCab.driverService.dto;
@@ -2642,6 +3320,7 @@ public class DriverResponse {
     private String vehicleNumber;
     private LocalDateTime createdAt;
 }
+========================================================================
 FILE: locationService\src\main\java\com\flashCab\driverService\model\VehicleType.java
 ========================================================================
 package com.flashCab.driverService.model;
@@ -2653,6 +3332,7 @@ public enum VehicleType {
     PREMIUM,
     BIKE
 }
+========================================================================
 FILE: locationService\src\main\java\com\flashCab\locationService\client\DriverServiceClient.java
 ========================================================================
 package com.flashCab.locationService.client;
@@ -2673,6 +3353,28 @@ public interface DriverServiceClient {
     @GetMapping("/api/v1/drivers")
     List<DriverResponse> getDrivers();
 }
+========================================================================
+FILE: locationService\src\main\java\com\flashCab\locationService\config\OpenApiConfig.java
+========================================================================
+package com.flashCab.locationService.config;
+
+import io.swagger.v3.oas.models.OpenAPI;
+import io.swagger.v3.oas.models.info.Info;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+
+@Configuration
+public class OpenApiConfig {
+
+    @Bean
+    public OpenAPI locationServiceOpenAPI() {
+        return new OpenAPI().info(new Info()
+                .title("FlashCab Location Service API")
+                .description("API for updating driver locations and managing driver availability.")
+                .version("1.0.0"));
+    }
+}
+========================================================================
 FILE: locationService\src\main\java\com\flashCab\locationService\config\RedisConfig.java
 ========================================================================
 package com.flashCab.locationService.config;
@@ -2698,6 +3400,7 @@ public class RedisConfig {
     }
 
 }
+========================================================================
 FILE: locationService\src\main\java\com\flashCab\locationService\controller\LocationController.java
 ========================================================================
 package com.flashCab.locationService.controller;
@@ -2705,6 +3408,14 @@ package com.flashCab.locationService.controller;
 import com.flashCab.locationService.dto.DriverLocationRequest;
 import com.flashCab.locationService.dto.NearByDriverResponse;
 import com.flashCab.locationService.service.LocationService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.ArraySchema;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
@@ -2716,43 +3427,86 @@ import java.util.List;
 @RequestMapping("/api/v1/locations")
 @Slf4j
 @RequiredArgsConstructor
+@Tag(name = "Locations", description = "Driver location and availability operations")
 public class LocationController {
     private final LocationService locationService;
 
     @PostMapping("/drivers/update")
+    @Operation(
+            summary = "Update a driver's location",
+            description = "Stores the driver's latest coordinates.",
+            requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(
+                    description = "Driver identifier and coordinates", required = true,
+                    content = @Content(schema = @Schema(implementation = DriverLocationRequest.class))))
+    @ApiResponses(@ApiResponse(responseCode = "200", description = "Location updated",
+            content = @Content(mediaType = "text/plain", schema = @Schema(implementation = String.class))))
     public ResponseEntity<String> updateDriverLocation(@RequestBody DriverLocationRequest driverLocationRequest) {
         locationService.updateDriverLocation(driverLocationRequest);
         return ResponseEntity.ok("Driver location updated");
     }
 
     @GetMapping("/drivers/seed")
-    public ResponseEntity<String> seedDrivers(@RequestParam int count, @RequestParam double minLatitude, @RequestParam double maxLatitude, @RequestParam double minLongitude, @RequestParam double maxLongitude) {
+    @Operation(summary = "Seed driver locations", description = "Adds driver locations within the specified coordinate bounds.")
+    @ApiResponses(@ApiResponse(responseCode = "200", description = "Number of locations added",
+            content = @Content(mediaType = "text/plain", schema = @Schema(implementation = String.class))))
+    public ResponseEntity<String> seedDrivers(
+            @Parameter(description = "Number of driver locations to add", required = true) @RequestParam int count,
+            @Parameter(description = "Minimum latitude of the seed area", required = true)
+            @RequestParam double minLatitude,
+            @Parameter(description = "Maximum latitude of the seed area", required = true)
+            @RequestParam double maxLatitude,
+            @Parameter(description = "Minimum longitude of the seed area", required = true)
+            @RequestParam double minLongitude,
+            @Parameter(description = "Maximum longitude of the seed area", required = true)
+            @RequestParam double maxLongitude) {
         int added = locationService.seedDrivers(count, minLatitude, maxLatitude, minLongitude, maxLongitude);
         return ResponseEntity.ok(added + " drivers added to Redis");
     }
 
     @GetMapping("/drivers/nearby")
-    public ResponseEntity<List<NearByDriverResponse>> getNearByDrivers(@RequestParam double latitude, @RequestParam double longitude, @RequestParam(defaultValue = "5.0") double radiusInKm) {
+    @Operation(summary = "Find nearby drivers", description = "Returns drivers within the requested radius of the supplied coordinates.")
+    @ApiResponses(@ApiResponse(responseCode = "200", description = "Nearby drivers",
+            content = @Content(array = @ArraySchema(schema = @Schema(implementation = NearByDriverResponse.class)))))
+    public ResponseEntity<List<NearByDriverResponse>> getNearByDrivers(
+            @Parameter(description = "Search center latitude", required = true) @RequestParam double latitude,
+            @Parameter(description = "Search center longitude", required = true) @RequestParam double longitude,
+            @Parameter(description = "Search radius in kilometers; defaults to 5.0")
+            @RequestParam(defaultValue = "5.0") double radiusInKm) {
         return ResponseEntity.ok(locationService.findNearByDrivers(latitude, longitude, radiusInKm));
     }
 
     @PostMapping("/drivers/{driverId}/reserve")
-    public ResponseEntity<Boolean> reserveDriver(@PathVariable String driverId, @RequestParam String rideId) {
+    @Operation(summary = "Reserve a driver", description = "Reserves the specified driver for a ride.")
+    @ApiResponses(@ApiResponse(responseCode = "200", description = "Whether the driver was reserved",
+            content = @Content(schema = @Schema(implementation = Boolean.class))))
+    public ResponseEntity<Boolean> reserveDriver(
+            @Parameter(description = "Identifier of the driver", required = true) @PathVariable String driverId,
+            @Parameter(description = "Identifier of the ride", required = true) @RequestParam String rideId) {
         return ResponseEntity.ok(locationService.reserveDriver(driverId, rideId));
     }
 
     @PostMapping("/drivers/{driverId}/release")
-    public ResponseEntity<Boolean> releaseDriver(@PathVariable String driverId, @RequestParam String rideId) {
+    @Operation(summary = "Release a driver", description = "Releases the specified driver's reservation for a ride.")
+    @ApiResponses(@ApiResponse(responseCode = "200", description = "Whether the driver was released",
+            content = @Content(schema = @Schema(implementation = Boolean.class))))
+    public ResponseEntity<Boolean> releaseDriver(
+            @Parameter(description = "Identifier of the driver", required = true) @PathVariable String driverId,
+            @Parameter(description = "Identifier of the ride", required = true) @RequestParam String rideId) {
         return ResponseEntity.ok(locationService.releaseDriver(driverId, rideId));
     }
 
     @DeleteMapping("/drivers/{driverId}")
-    public ResponseEntity<String> removeDriver(@PathVariable String driverId) {
+    @Operation(summary = "Remove a driver location", description = "Removes the specified driver's location and availability entry.")
+    @ApiResponses(@ApiResponse(responseCode = "200", description = "Driver location removed",
+            content = @Content(mediaType = "text/plain", schema = @Schema(implementation = String.class))))
+    public ResponseEntity<String> removeDriver(
+            @Parameter(description = "Identifier of the driver", required = true) @PathVariable String driverId) {
         locationService.removeDriver(driverId);
         return ResponseEntity.ok("Driver Removed");
 
     }
 }
+========================================================================
 FILE: locationService\src\main\java\com\flashCab\locationService\dto\DriverLocationRequest.java
 ========================================================================
 package com.flashCab.locationService.dto;
@@ -2769,6 +3523,7 @@ public class DriverLocationRequest {
     private Double latitude;
     private Double longitude;
 }
+========================================================================
 FILE: locationService\src\main\java\com\flashCab\locationService\dto\NearByDriverResponse.java
 ========================================================================
 package com.flashCab.locationService.dto;
@@ -2786,6 +3541,7 @@ public class NearByDriverResponse {
     private Double longitude;
     private Double distanceInKm;
 }
+========================================================================
 FILE: locationService\src\main\java\com\flashCab\locationService\LocationServiceApplication.java
 ========================================================================
 package com.flashCab.locationService;
@@ -2803,6 +3559,7 @@ public class LocationServiceApplication {
 	}
 
 }
+========================================================================
 FILE: locationService\src\main\java\com\flashCab\locationService\service\LocationService.java
 ========================================================================
 package com.flashCab.locationService.service;
@@ -2991,6 +3748,7 @@ public class LocationService {
     }
 
 }
+========================================================================
 FILE: locationService\src\main\resources\application.properties
 ========================================================================
 spring.application.name=locationService
@@ -3002,6 +3760,7 @@ spring.data.redis.port=6379
 driver.service.url=http://localhost:8085
 # Actuator
 management.endpoints.web.exposure.include=health, info
+========================================================================
 FILE: locationService\src\test\java\com\flashCab\locationService\LocationServiceApplicationTests.java
 ========================================================================
 package com.flashCab.locationService;
@@ -3017,60 +3776,12 @@ class LocationServiceApplicationTests {
 	}
 
 }
-FILE: locationService\src\test\java\com\flashCab\locationService\service\LocationServiceReservationTests.java
 ========================================================================
-package com.flashCab.locationService.service;
-
-import com.flashCab.locationService.client.DriverServiceClient;
-import org.junit.jupiter.api.Test;
-import org.springframework.data.redis.core.RedisTemplate;
-import org.springframework.data.redis.core.script.RedisScript;
-
-import java.util.List;
-
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyList;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
-
-class LocationServiceReservationTests {
-
-    @SuppressWarnings("unchecked")
-    private final RedisTemplate<String, String> redisTemplate = mock(RedisTemplate.class);
-    private final LocationService locationService =
-            new LocationService(redisTemplate, mock(DriverServiceClient.class));
-
-    @Test
-    void reportsSuccessfulReservation() {
-        when(redisTemplate.execute(any(RedisScript.class), anyList(), eq("driver-1"), eq("ride-1")))
-                .thenReturn(1L);
-
-        assertTrue(locationService.reserveDriver("driver-1", "ride-1"));
-    }
-
-    @Test
-    void reportsUnavailableReservation() {
-        when(redisTemplate.execute(any(RedisScript.class), anyList(), eq("driver-1"), eq("ride-2")))
-                .thenReturn(0L);
-
-        assertFalse(locationService.reserveDriver("driver-1", "ride-2"));
-    }
-
-    @Test
-    void releaseOperationIncludesTheOwningRideId() {
-        when(redisTemplate.execute(any(RedisScript.class), eq(List.of("drivers.availability", "drivers.reservations")),
-                eq("driver-1"), eq("ride-1"))).thenReturn(1L);
-
-        assertTrue(locationService.releaseDriver("driver-1", "ride-1"));
-    }
-}
 FILE: matchingService\.gitattributes
 ========================================================================
 /mvnw text eol=lf
 *.cmd text eol=crlf
+========================================================================
 FILE: matchingService\.gitignore
 ========================================================================
 HELP.md
@@ -3106,11 +3817,7 @@ build/
 
 ### VS Code ###
 .vscode/
-FILE: matchingService\.mvn\wrapper\maven-wrapper.properties
 ========================================================================
-wrapperVersion=3.3.4
-distributionType=only-script
-distributionUrl=https://repo.maven.apache.org/maven2/org/apache/maven/apache-maven/3.10.0/apache-maven-3.10.0-bin.zip
 FILE: matchingService\HELP.md
 ========================================================================
 # Getting Started
@@ -3140,6 +3847,7 @@ While most of the inheritance is fine, it also inherits unwanted elements like `
 To prevent this, the project POM contains empty overrides for these elements.
 If you manually switch to a different parent and actually want the inheritance, you need to remove those overrides.
 
+========================================================================
 FILE: matchingService\mvnw
 ========================================================================
 #!/bin/sh
@@ -3330,7 +4038,7 @@ __MVNW_QUIET_WGET=--quiet __MVNW_QUIET_CURL=--silent __MVNW_QUIET_UNZIP=-q __MVN
 [ "${MVNW_VERBOSE-}" != true ] || __MVNW_QUIET_WGET='' __MVNW_QUIET_CURL='' __MVNW_QUIET_UNZIP='' __MVNW_QUIET_TAR=v
 
 # normalize http auth
-case "${MVNW_PASSWORD:+has-password}" in
+case "${MVNW_PASSWORD=<REDACTED> in
 '') MVNW_USERNAME='' MVNW_PASSWORD='' ;;
 has-password) [ -n "${MVNW_USERNAME-}" ] || MVNW_USERNAME='' MVNW_PASSWORD='' ;;
 esac
@@ -3437,6 +4145,7 @@ mv -- "$TMP_DOWNLOAD_DIR/$actualDistributionDir" "$MAVEN_HOME" || [ -d "$MAVEN_H
 
 clean || :
 exec_maven "$@"
+========================================================================
 FILE: matchingService\mvnw.cmd
 ========================================================================
 <# : batch portion
@@ -3480,8 +4189,7 @@ FILE: matchingService\mvnw.cmd
 @SET __MVNW_PSMODULEP_SAVE=
 @SET __MVNW_ARG0_NAME__=
 @SET MVNW_USERNAME=
-@SET MVNW_PASSWORD=
-@IF NOT "%__MVNW_CMD__%"=="" ("%__MVNW_CMD__%" %*)
+@SET MVNW_PASSWORD=<REDACTED> NOT "%__MVNW_CMD__%"=="" ("%__MVNW_CMD__%" %*)
 @echo Cannot start maven from wrapper >&2 && exit /b 1
 @GOTO :EOF
 : end batch / begin powershell #>
@@ -3628,6 +4336,7 @@ try {
 }
 
 Write-Output "MVN_CMD=$MAVEN_HOME/bin/$MVN_CMD"
+========================================================================
 FILE: matchingService\pom.xml
 ========================================================================
 <?xml version="1.0" encoding="UTF-8"?>
@@ -3761,6 +4470,7 @@ FILE: matchingService\pom.xml
     </build>
 
 </project>
+========================================================================
 FILE: matchingService\src\main\java\com\flashCab\matchingService\client\DriverServiceClient.java
 ========================================================================
 package com.flashCab.matchingService.client;
@@ -3778,6 +4488,7 @@ public interface DriverServiceClient {
     @GetMapping("/api/v1/drivers/batch")
     List<DriverProfileResponse> getDriversByIds(@RequestParam("ids") List<String> ids);
 }
+========================================================================
 FILE: matchingService\src\main\java\com\flashCab\matchingService\client\LocationServiceClient.java
 ========================================================================
 package com.flashCab.matchingService.client;
@@ -3804,6 +4515,7 @@ public interface LocationServiceClient {
     @PostMapping("/api/v1/locations/drivers/{driverId}/release")
     boolean releaseDriver(@PathVariable("driverId") String driverId, @RequestParam("rideId") String rideId);
 }
+========================================================================
 FILE: matchingService\src\main\java\com\flashCab\matchingService\dto\DriverProfileResponse.java
 ========================================================================
 package com.flashCab.matchingService.dto;
@@ -3823,6 +4535,7 @@ public class DriverProfileResponse {
     private String vehicleType;
     private String vehicleNumber;
 }
+========================================================================
 FILE: matchingService\src\main\java\com\flashCab\matchingService\dto\NearByDriverResponse.java
 ========================================================================
 package com.flashCab.matchingService.dto;
@@ -3842,6 +4555,7 @@ public class NearByDriverResponse {
     private Double distanceInKm;
 
 }
+========================================================================
 FILE: matchingService\src\main\java\com\flashCab\matchingService\event\RideMatchedEvent.java
 ========================================================================
 package com.flashCab.matchingService.event;
@@ -3870,6 +4584,7 @@ public class RideMatchedEvent {
     private String vehicleType;
 
 }
+========================================================================
 FILE: matchingService\src\main\java\com\flashCab\matchingService\event\RideRequestedEvent.java
 ========================================================================
 package com.flashCab.matchingService.event;
@@ -3901,6 +4616,7 @@ public class RideRequestedEvent {
 
     private String vehicleType;
 }
+========================================================================
 FILE: matchingService\src\main\java\com\flashCab\matchingService\MatchingServiceApplication.java
 ========================================================================
 package com.flashCab.matchingService;
@@ -3918,6 +4634,7 @@ public class MatchingServiceApplication {
     }
 
 }
+========================================================================
 FILE: matchingService\src\main\java\com\flashCab\matchingService\service\MatchingService.java
 ========================================================================
 package com.flashCab.matchingService.service;
@@ -4070,6 +4787,7 @@ public class MatchingService {
     }
 
 }
+========================================================================
 FILE: matchingService\src\main\java\com\flashCab\matchingService\service\RideEventConsumer.java
 ========================================================================
 package com.flashCab.matchingService.service;
@@ -4097,6 +4815,7 @@ public class RideEventConsumer {
     }
 
 }
+========================================================================
 FILE: matchingService\src\main\resources\application.yaml
 ========================================================================
 spring:
@@ -4136,6 +4855,7 @@ management:
 
 server:
   port: 8084
+========================================================================
 FILE: matchingService\src\test\java\com\flashCab\matchingService\MatchingServiceApplicationTests.java
 ========================================================================
 package com.flashCab.matchingService;
@@ -4151,87 +4871,12 @@ class MatchingServiceApplicationTests {
 	}
 
 }
-FILE: matchingService\src\test\java\com\flashCab\matchingService\MatchingServiceReservationTests.java
 ========================================================================
-package com.flashCab.matchingService;
-
-import com.flashCab.matchingService.client.DriverServiceClient;
-import com.flashCab.matchingService.client.LocationServiceClient;
-import com.flashCab.matchingService.dto.DriverProfileResponse;
-import com.flashCab.matchingService.dto.NearByDriverResponse;
-import com.flashCab.matchingService.event.RideMatchedEvent;
-import com.flashCab.matchingService.event.RideRequestedEvent;
-import com.flashCab.matchingService.service.MatchingService;
-import org.junit.jupiter.api.Test;
-import org.springframework.kafka.core.KafkaTemplate;
-
-import java.util.List;
-
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyDouble;
-import static org.mockito.ArgumentMatchers.anyList;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.*;
-
-class MatchingServiceReservationTests {
-
-    private final LocationServiceClient locationServiceClient = mock(LocationServiceClient.class);
-    private final DriverServiceClient driverServiceClient = mock(DriverServiceClient.class);
-    @SuppressWarnings("unchecked")
-    private final KafkaTemplate<String, RideMatchedEvent> kafkaTemplate = mock(KafkaTemplate.class);
-    private final MatchingService matchingService =
-            new MatchingService(locationServiceClient, driverServiceClient, kafkaTemplate);
-
-    @Test
-    void triesNextRankedCandidateWhenReservationFails() {
-        when(locationServiceClient.getNearByDrivers(anyDouble(), anyDouble(), anyDouble()))
-                .thenReturn(nearbyDrivers());
-        when(driverServiceClient.getDriversByIds(anyList())).thenReturn(driverProfiles());
-        when(locationServiceClient.reserveDriver(anyString(), eq("ride-1"))).thenReturn(false, true);
-
-        matchingService.matchDriverForRide(rideRequestedEvent());
-
-        verify(locationServiceClient, times(2)).reserveDriver(anyString(), eq("ride-1"));
-        verify(kafkaTemplate).send(eq("ride.matched"), eq("ride-1"), any(RideMatchedEvent.class));
-    }
-
-    @Test
-    void doesNotPublishWhenNoCandidateCanBeReserved() {
-        when(locationServiceClient.getNearByDrivers(anyDouble(), anyDouble(), anyDouble()))
-                .thenReturn(nearbyDrivers());
-        when(driverServiceClient.getDriversByIds(anyList())).thenReturn(driverProfiles());
-        when(locationServiceClient.reserveDriver(anyString(), eq("ride-1"))).thenReturn(false);
-
-        matchingService.matchDriverForRide(rideRequestedEvent());
-
-        verify(locationServiceClient, times(2)).reserveDriver(anyString(), eq("ride-1"));
-        verifyNoInteractions(kafkaTemplate);
-    }
-
-    private List<NearByDriverResponse> nearbyDrivers() {
-        return List.of(
-                new NearByDriverResponse("driver-1", 1.0, 1.0, 1.0),
-                new NearByDriverResponse("driver-2", 2.0, 2.0, 5.0)
-        );
-    }
-
-    private List<DriverProfileResponse> driverProfiles() {
-        return List.of(
-                new DriverProfileResponse("driver-1", "One", "one@example.com", "1", "SEDAN", "A"),
-                new DriverProfileResponse("driver-2", "Two", "two@example.com", "2", "SEDAN", "B")
-        );
-    }
-
-    private RideRequestedEvent rideRequestedEvent() {
-        return new RideRequestedEvent("rider-1", "ride-1", 1.0, 1.0, "pickup",
-                2.0, 2.0, "drop", "SEDAN");
-    }
-}
 FILE: riderService\.gitattributes
 ========================================================================
 /mvnw text eol=lf
 *.cmd text eol=crlf
+========================================================================
 FILE: riderService\.gitignore
 ========================================================================
 HELP.md
@@ -4267,11 +4912,7 @@ build/
 
 ### VS Code ###
 .vscode/
-FILE: riderService\.mvn\wrapper\maven-wrapper.properties
 ========================================================================
-wrapperVersion=3.3.4
-distributionType=only-script
-distributionUrl=https://repo.maven.apache.org/maven2/org/apache/maven/apache-maven/3.10.0/apache-maven-3.10.0-bin.zip
 FILE: riderService\HELP.md
 ========================================================================
 # Getting Started
@@ -4302,6 +4943,7 @@ While most of the inheritance is fine, it also inherits unwanted elements like `
 To prevent this, the project POM contains empty overrides for these elements.
 If you manually switch to a different parent and actually want the inheritance, you need to remove those overrides.
 
+========================================================================
 FILE: riderService\mvnw
 ========================================================================
 #!/bin/sh
@@ -4492,7 +5134,7 @@ __MVNW_QUIET_WGET=--quiet __MVNW_QUIET_CURL=--silent __MVNW_QUIET_UNZIP=-q __MVN
 [ "${MVNW_VERBOSE-}" != true ] || __MVNW_QUIET_WGET='' __MVNW_QUIET_CURL='' __MVNW_QUIET_UNZIP='' __MVNW_QUIET_TAR=v
 
 # normalize http auth
-case "${MVNW_PASSWORD:+has-password}" in
+case "${MVNW_PASSWORD=<REDACTED> in
 '') MVNW_USERNAME='' MVNW_PASSWORD='' ;;
 has-password) [ -n "${MVNW_USERNAME-}" ] || MVNW_USERNAME='' MVNW_PASSWORD='' ;;
 esac
@@ -4599,6 +5241,7 @@ mv -- "$TMP_DOWNLOAD_DIR/$actualDistributionDir" "$MAVEN_HOME" || [ -d "$MAVEN_H
 
 clean || :
 exec_maven "$@"
+========================================================================
 FILE: riderService\mvnw.cmd
 ========================================================================
 <# : batch portion
@@ -4642,8 +5285,7 @@ FILE: riderService\mvnw.cmd
 @SET __MVNW_PSMODULEP_SAVE=
 @SET __MVNW_ARG0_NAME__=
 @SET MVNW_USERNAME=
-@SET MVNW_PASSWORD=
-@IF NOT "%__MVNW_CMD__%"=="" ("%__MVNW_CMD__%" %*)
+@SET MVNW_PASSWORD=<REDACTED> NOT "%__MVNW_CMD__%"=="" ("%__MVNW_CMD__%" %*)
 @echo Cannot start maven from wrapper >&2 && exit /b 1
 @GOTO :EOF
 : end batch / begin powershell #>
@@ -4790,6 +5432,7 @@ try {
 }
 
 Write-Output "MVN_CMD=$MAVEN_HOME/bin/$MVN_CMD"
+========================================================================
 FILE: riderService\pom.xml
 ========================================================================
 <?xml version="1.0" encoding="UTF-8"?>
@@ -4822,6 +5465,7 @@ FILE: riderService\pom.xml
 	</scm>
 	<properties>
 		<java.version>17</java.version>
+		<springdoc.version>3.0.0</springdoc.version>
 	</properties>
 	<dependencies>
 		<dependency>
@@ -4839,6 +5483,11 @@ FILE: riderService\pom.xml
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-webmvc</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.springdoc</groupId>
+			<artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+			<version>${springdoc.version}</version>
 		</dependency>
 
 		<dependency>
@@ -4914,6 +5563,28 @@ FILE: riderService\pom.xml
 	</build>
 
 </project>
+========================================================================
+FILE: riderService\src\main\java\com\flashCab\riderService\config\OpenApiConfig.java
+========================================================================
+package com.flashCab.riderService.config;
+
+import io.swagger.v3.oas.models.OpenAPI;
+import io.swagger.v3.oas.models.info.Info;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+
+@Configuration
+public class OpenApiConfig {
+
+    @Bean
+    public OpenAPI riderServiceOpenAPI() {
+        return new OpenAPI().info(new Info()
+                .title("FlashCab Rider Service API")
+                .description("API for registering and managing FlashCab riders.")
+                .version("1.0.0"));
+    }
+}
+========================================================================
 FILE: riderService\src\main\java\com\flashCab\riderService\controller\RiderController.java
 ========================================================================
 package com.flashCab.riderService.controller;
@@ -4921,6 +5592,14 @@ package com.flashCab.riderService.controller;
 import com.flashCab.riderService.dto.RiderRequest;
 import com.flashCab.riderService.dto.RiderResponse;
 import com.flashCab.riderService.service.RiderService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.ArraySchema;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -4932,38 +5611,66 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/v1/riders")
 @RequiredArgsConstructor
+@Tag(name = "Riders", description = "Rider registration and profile management")
 public class RiderController {
 
     private final RiderService riderService;
 
     @PostMapping
+    @Operation(
+            summary = "Register a rider",
+            description = "Creates a rider profile using the supplied contact details.",
+            requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(
+                    description = "Rider profile details", required = true,
+                    content = @Content(schema = @Schema(implementation = RiderRequest.class))))
+    @ApiResponses(@ApiResponse(responseCode = "201", description = "Rider registered",
+            content = @Content(schema = @Schema(implementation = RiderResponse.class))))
     public ResponseEntity<RiderResponse> registerRider(@Valid @RequestBody RiderRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED).body(riderService.registerRider(request));
     }
 
     @GetMapping
+    @Operation(summary = "List riders", description = "Returns all registered riders.")
+    @ApiResponses(@ApiResponse(responseCode = "200", description = "Rider list",
+            content = @Content(array = @ArraySchema(schema = @Schema(implementation = RiderResponse.class)))))
     public ResponseEntity<List<RiderResponse>> getAllRiders() {
         return ResponseEntity.ok(riderService.getAllRiders());
     }
 
     @GetMapping("/{riderId}")
-    public ResponseEntity<RiderResponse> getRiderById(@PathVariable String riderId) {
+    @Operation(summary = "Get a rider", description = "Returns a rider by identifier.")
+    @ApiResponses(@ApiResponse(responseCode = "200", description = "Rider profile",
+            content = @Content(schema = @Schema(implementation = RiderResponse.class))))
+    public ResponseEntity<RiderResponse> getRiderById(
+            @Parameter(description = "Identifier of the rider", required = true) @PathVariable String riderId) {
         return ResponseEntity.ok(riderService.getRiderById(riderId));
     }
 
     @PutMapping("/{riderId}")
+    @Operation(
+            summary = "Update a rider",
+            description = "Replaces the rider profile details for the specified identifier.",
+            requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(
+                    description = "Updated rider profile details", required = true,
+                    content = @Content(schema = @Schema(implementation = RiderRequest.class))))
+    @ApiResponses(@ApiResponse(responseCode = "200", description = "Updated rider profile",
+            content = @Content(schema = @Schema(implementation = RiderResponse.class))))
     public ResponseEntity<RiderResponse> updateRider(
-            @PathVariable String riderId,
+            @Parameter(description = "Identifier of the rider", required = true) @PathVariable String riderId,
             @Valid @RequestBody RiderRequest request) {
         return ResponseEntity.ok(riderService.updateRider(riderId, request));
     }
 
     @DeleteMapping("/{riderId}")
-    public ResponseEntity<Void> deleteRider(@PathVariable String riderId) {
+    @Operation(summary = "Delete a rider", description = "Deletes the rider with the specified identifier.")
+    @ApiResponses(@ApiResponse(responseCode = "204", description = "Rider deleted"))
+    public ResponseEntity<Void> deleteRider(
+            @Parameter(description = "Identifier of the rider", required = true) @PathVariable String riderId) {
         riderService.deleteRider(riderId);
         return ResponseEntity.noContent().build();
     }
 }
+========================================================================
 FILE: riderService\src\main\java\com\flashCab\riderService\dto\RiderRequest.java
 ========================================================================
 package com.flashCab.riderService.dto;
@@ -4985,6 +5692,7 @@ public class RiderRequest {
     @NotBlank(message = "Phone is required")
     private String phone;
 }
+========================================================================
 FILE: riderService\src\main\java\com\flashCab\riderService\dto\RiderResponse.java
 ========================================================================
 package com.flashCab.riderService.dto;
@@ -5012,6 +5720,7 @@ public class RiderResponse {
 
     private LocalDateTime updatedAt;
 }
+========================================================================
 FILE: riderService\src\main\java\com\flashCab\riderService\exception\GlobalExceptionHandler.java
 ========================================================================
 package com.flashCab.riderService.exception;
@@ -5046,6 +5755,7 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(ex.getStatusCode()).body(errors);
     }
 }
+========================================================================
 FILE: riderService\src\main\java\com\flashCab\riderService\model\Rider.java
 ========================================================================
 package com.flashCab.riderService.model;
@@ -5077,6 +5787,7 @@ public class Rider {
 
     private LocalDateTime updatedAt;
 }
+========================================================================
 FILE: riderService\src\main\java\com\flashCab\riderService\repository\RiderRepository.java
 ========================================================================
 package com.flashCab.riderService.repository;
@@ -5086,6 +5797,7 @@ import org.springframework.data.mongodb.repository.MongoRepository;
 
 public interface RiderRepository extends MongoRepository<Rider, String> {
 }
+========================================================================
 FILE: riderService\src\main\java\com\flashCab\riderService\RiderServiceApplication.java
 ========================================================================
 package com.flashCab.riderService;
@@ -5101,6 +5813,7 @@ public class RiderServiceApplication {
 	}
 
 }
+========================================================================
 FILE: riderService\src\main\java\com\flashCab\riderService\service\RiderService.java
 ========================================================================
 package com.flashCab.riderService.service;
@@ -5176,6 +5889,7 @@ public class RiderService {
         );
     }
 }
+========================================================================
 FILE: riderService\src\main\resources\application.yaml
 ========================================================================
 spring:
@@ -5192,6 +5906,7 @@ management:
     web:
       exposure:
         include: health, info
+========================================================================
 FILE: riderService\src\test\java\com\flashCab\riderService\RiderServiceApplicationTests.java
 ========================================================================
 package com.flashCab.riderService;
@@ -5207,10 +5922,12 @@ class RiderServiceApplicationTests {
 	}
 
 }
+========================================================================
 FILE: rideService\.gitattributes
 ========================================================================
 /mvnw text eol=lf
 *.cmd text eol=crlf
+========================================================================
 FILE: rideService\.gitignore
 ========================================================================
 HELP.md
@@ -5246,11 +5963,7 @@ build/
 
 ### VS Code ###
 .vscode/
-FILE: rideService\.mvn\wrapper\maven-wrapper.properties
 ========================================================================
-wrapperVersion=3.3.4
-distributionType=only-script
-distributionUrl=https://repo.maven.apache.org/maven2/org/apache/maven/apache-maven/3.10.0/apache-maven-3.10.0-bin.zip
 FILE: rideService\HELP.md
 ========================================================================
 # Getting Started
@@ -5285,6 +5998,7 @@ While most of the inheritance is fine, it also inherits unwanted elements like `
 To prevent this, the project POM contains empty overrides for these elements.
 If you manually switch to a different parent and actually want the inheritance, you need to remove those overrides.
 
+========================================================================
 FILE: rideService\mvnw
 ========================================================================
 #!/bin/sh
@@ -5475,7 +6189,7 @@ __MVNW_QUIET_WGET=--quiet __MVNW_QUIET_CURL=--silent __MVNW_QUIET_UNZIP=-q __MVN
 [ "${MVNW_VERBOSE-}" != true ] || __MVNW_QUIET_WGET='' __MVNW_QUIET_CURL='' __MVNW_QUIET_UNZIP='' __MVNW_QUIET_TAR=v
 
 # normalize http auth
-case "${MVNW_PASSWORD:+has-password}" in
+case "${MVNW_PASSWORD=<REDACTED> in
 '') MVNW_USERNAME='' MVNW_PASSWORD='' ;;
 has-password) [ -n "${MVNW_USERNAME-}" ] || MVNW_USERNAME='' MVNW_PASSWORD='' ;;
 esac
@@ -5582,6 +6296,7 @@ mv -- "$TMP_DOWNLOAD_DIR/$actualDistributionDir" "$MAVEN_HOME" || [ -d "$MAVEN_H
 
 clean || :
 exec_maven "$@"
+========================================================================
 FILE: rideService\mvnw.cmd
 ========================================================================
 <# : batch portion
@@ -5625,8 +6340,7 @@ FILE: rideService\mvnw.cmd
 @SET __MVNW_PSMODULEP_SAVE=
 @SET __MVNW_ARG0_NAME__=
 @SET MVNW_USERNAME=
-@SET MVNW_PASSWORD=
-@IF NOT "%__MVNW_CMD__%"=="" ("%__MVNW_CMD__%" %*)
+@SET MVNW_PASSWORD=<REDACTED> NOT "%__MVNW_CMD__%"=="" ("%__MVNW_CMD__%" %*)
 @echo Cannot start maven from wrapper >&2 && exit /b 1
 @GOTO :EOF
 : end batch / begin powershell #>
@@ -5773,6 +6487,7 @@ try {
 }
 
 Write-Output "MVN_CMD=$MAVEN_HOME/bin/$MVN_CMD"
+========================================================================
 FILE: rideService\pom.xml
 ========================================================================
 <?xml version="1.0" encoding="UTF-8"?>
@@ -5806,6 +6521,7 @@ FILE: rideService\pom.xml
 	<properties>
 		<java.version>17</java.version>
 		<spring-cloud.version>2025.1.4</spring-cloud.version>
+		<springdoc.version>3.0.0</springdoc.version>
 	</properties>
 	<dependencies>
 		<dependency>
@@ -5827,6 +6543,11 @@ FILE: rideService\pom.xml
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-webmvc</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.springdoc</groupId>
+			<artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+			<version>${springdoc.version}</version>
 		</dependency>
 		<dependency>
 			<groupId>org.springframework.cloud</groupId>
@@ -5928,6 +6649,7 @@ FILE: rideService\pom.xml
 	</build>
 
 </project>
+========================================================================
 FILE: rideService\src\main\java\com\flashCab\driverService\dto\DriverResponse.java
 ========================================================================
 package com.flashCab.driverService.dto;
@@ -5951,6 +6673,7 @@ public class DriverResponse {
     private String vehicleNumber;
     private LocalDateTime createdAt;
 }
+========================================================================
 FILE: rideService\src\main\java\com\flashCab\driverService\model\VehicleType.java
 ========================================================================
 package com.flashCab.driverService.model;
@@ -5962,6 +6685,7 @@ public enum VehicleType {
     PREMIUM,
     BIKE
 }
+========================================================================
 FILE: rideService\src\main\java\com\flashCab\riderService\dto\RiderResponse.java
 ========================================================================
 package com.flashCab.riderService.dto;
@@ -5983,6 +6707,7 @@ public class RiderResponse {
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }
+========================================================================
 FILE: rideService\src\main\java\com\flashCab\rideService\client\DriverServiceClient.java
 ========================================================================
 package com.flashCab.rideService.client;
@@ -5998,6 +6723,7 @@ public interface DriverServiceClient {
     @GetMapping("/api/v1/drivers/{driverId}")
     DriverResponse getDriverById(@PathVariable("driverId") String driverId);
 }
+========================================================================
 FILE: rideService\src\main\java\com\flashCab\rideService\client\LocationServiceClient.java
 ========================================================================
 package com.flashCab.rideService.client;
@@ -6013,6 +6739,7 @@ public interface LocationServiceClient {
     @PostMapping("/api/v1/locations/drivers/{driverId}/release")
     boolean releaseDriver(@PathVariable("driverId") String driverId, @RequestParam("rideId") String rideId);
 }
+========================================================================
 FILE: rideService\src\main\java\com\flashCab\rideService\client\OpenMeteoWeatherClient.java
 ========================================================================
 package com.flashCab.rideService.client;
@@ -6056,6 +6783,7 @@ public class OpenMeteoWeatherClient {
                 .body(OpenMeteoWeatherResponse.class);
     }
 }
+========================================================================
 FILE: rideService\src\main\java\com\flashCab\rideService\client\RiderServiceClient.java
 ========================================================================
 package com.flashCab.rideService.client;
@@ -6071,6 +6799,7 @@ public interface RiderServiceClient {
     @GetMapping("/api/v1/riders/{riderId}")
     RiderResponse getRiderById(@PathVariable("riderId") String riderId);
 }
+========================================================================
 FILE: rideService\src\main\java\com\flashCab\rideService\config\KafkaConfig.java
 ========================================================================
 package com.flashCab.rideService.config;
@@ -6095,6 +6824,28 @@ public class KafkaConfig {
     }
 
 }
+========================================================================
+FILE: rideService\src\main\java\com\flashCab\rideService\config\OpenApiConfig.java
+========================================================================
+package com.flashCab.rideService.config;
+
+import io.swagger.v3.oas.models.OpenAPI;
+import io.swagger.v3.oas.models.info.Info;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+
+@Configuration
+public class OpenApiConfig {
+
+    @Bean
+    public OpenAPI rideServiceOpenAPI() {
+        return new OpenAPI().info(new Info()
+                .title("FlashCab Ride Service API")
+                .description("API for requesting rides and managing their lifecycle.")
+                .version("1.0.0"));
+    }
+}
+========================================================================
 FILE: rideService\src\main\java\com\flashCab\rideService\controller\GlobalExceptionHandler.java
 ========================================================================
 package com.flashCab.rideService.controller;
@@ -6131,6 +6882,7 @@ public class GlobalExceptionHandler {
 }
 
 
+========================================================================
 FILE: rideService\src\main\java\com\flashCab\rideService\controller\RideController.java
 ========================================================================
 package com.flashCab.rideService.controller;
@@ -6139,6 +6891,14 @@ package com.flashCab.rideService.controller;
 import com.flashCab.rideService.dto.RideRequest;
 import com.flashCab.rideService.dto.RideResponse;
 import com.flashCab.rideService.service.RideService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.ArraySchema;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -6152,40 +6912,70 @@ import java.util.List;
 @RequestMapping("/api/v1/rides")
 @RequiredArgsConstructor
 @Slf4j
+@Tag(name = "Rides", description = "Ride booking and lifecycle operations")
 public class RideController {
     private final RideService rideService;
 
     @PostMapping("/request")
+    @Operation(
+            summary = "Request a ride",
+            description = "Creates a ride request with pickup, drop-off, and vehicle details.",
+            requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(
+                    description = "Ride request details", required = true,
+                    content = @Content(schema = @Schema(implementation = RideRequest.class))))
+    @ApiResponses(@ApiResponse(responseCode = "201", description = "Ride request created",
+            content = @Content(schema = @Schema(implementation = RideResponse.class))))
     public ResponseEntity<RideResponse> requestRide(@Valid @RequestBody RideRequest request) {
         log.info("Ride request received from rider: {}", request.getRiderId());
         return ResponseEntity.status(HttpStatus.CREATED).body(rideService.requestRide(request));
     }
 
     @GetMapping("/{rideId}")
-    public ResponseEntity<RideResponse> getRideById(@PathVariable String rideId) {
+    @Operation(summary = "Get a ride", description = "Returns a ride by identifier.")
+    @ApiResponses(@ApiResponse(responseCode = "200", description = "Ride details",
+            content = @Content(schema = @Schema(implementation = RideResponse.class))))
+    public ResponseEntity<RideResponse> getRideById(
+            @Parameter(description = "Identifier of the ride", required = true) @PathVariable String rideId) {
         return ResponseEntity.ok(rideService.getRideById(rideId));
     }
 
     @GetMapping("/rider/{riderId}")
-    public ResponseEntity<List<RideResponse>> getRidesByRider(@PathVariable String riderId) {
+    @Operation(summary = "List rides for a rider", description = "Returns the rides associated with the specified rider.")
+    @ApiResponses(@ApiResponse(responseCode = "200", description = "Rides for the rider",
+            content = @Content(array = @ArraySchema(schema = @Schema(implementation = RideResponse.class)))))
+    public ResponseEntity<List<RideResponse>> getRidesByRider(
+            @Parameter(description = "Identifier of the rider", required = true) @PathVariable String riderId) {
         return ResponseEntity.ok(rideService.getRidesByRider(riderId));
     }
 
     @PutMapping("/{rideId}/start")
-    public ResponseEntity<RideResponse> startRide(@PathVariable String rideId) {
+    @Operation(summary = "Start a ride", description = "Marks the specified ride as started.")
+    @ApiResponses(@ApiResponse(responseCode = "200", description = "Updated ride details",
+            content = @Content(schema = @Schema(implementation = RideResponse.class))))
+    public ResponseEntity<RideResponse> startRide(
+            @Parameter(description = "Identifier of the ride", required = true) @PathVariable String rideId) {
         return ResponseEntity.ok(rideService.startRide(rideId));
     }
 
     @PutMapping("/{rideId}/complete")
-    public ResponseEntity<RideResponse> completeRide(@PathVariable String rideId) {
+    @Operation(summary = "Complete a ride", description = "Marks the specified ride as completed.")
+    @ApiResponses(@ApiResponse(responseCode = "200", description = "Updated ride details",
+            content = @Content(schema = @Schema(implementation = RideResponse.class))))
+    public ResponseEntity<RideResponse> completeRide(
+            @Parameter(description = "Identifier of the ride", required = true) @PathVariable String rideId) {
         return ResponseEntity.ok(rideService.completeRide(rideId));
     }
 
     @PutMapping("/{rideId}/cancel")
-    public ResponseEntity<RideResponse> cancelRide(@PathVariable String rideId) {
+    @Operation(summary = "Cancel a ride", description = "Cancels the specified ride.")
+    @ApiResponses(@ApiResponse(responseCode = "200", description = "Updated ride details",
+            content = @Content(schema = @Schema(implementation = RideResponse.class))))
+    public ResponseEntity<RideResponse> cancelRide(
+            @Parameter(description = "Identifier of the ride", required = true) @PathVariable String rideId) {
         return ResponseEntity.ok(rideService.cancelRide(rideId));
     }
 }
+========================================================================
 FILE: rideService\src\main\java\com\flashCab\rideService\dto\OpenMeteoWeatherResponse.java
 ========================================================================
 package com.flashCab.rideService.dto;
@@ -6219,6 +7009,7 @@ public class OpenMeteoWeatherResponse {
         private Double windSpeed10m;
     }
 }
+========================================================================
 FILE: rideService\src\main\java\com\flashCab\rideService\dto\RideRequest.java
 ========================================================================
 package com.flashCab.rideService.dto;
@@ -6259,6 +7050,7 @@ public class RideRequest {
     @NotNull(message = "Vehicle type is required")
     private VehicleType vehicleType;
 }
+========================================================================
 FILE: rideService\src\main\java\com\flashCab\rideService\dto\RideResponse.java
 ========================================================================
 package com.flashCab.rideService.dto;
@@ -6307,6 +7099,7 @@ public class RideResponse {
 
     private LocalDateTime completedAt;
 }
+========================================================================
 FILE: rideService\src\main\java\com\flashCab\rideService\event\RideMatchedEvent.java
 ========================================================================
 package com.flashCab.rideService.event;
@@ -6336,6 +7129,7 @@ public class RideMatchedEvent {
     private VehicleType vehicleType;
 
 }
+========================================================================
 FILE: rideService\src\main\java\com\flashCab\rideService\event\RideRequestedEvent.java
 ========================================================================
 package com.flashCab.rideService.event;
@@ -6367,6 +7161,7 @@ public class RideRequestedEvent {
 
     private VehicleType vehicleType;
 }
+========================================================================
 FILE: rideService\src\main\java\com\flashCab\rideService\model\Ride.java
 ========================================================================
 package com.flashCab.rideService.model;
@@ -6438,6 +7233,7 @@ public class Ride {
     private LocalDateTime completedAt;
 
 }
+========================================================================
 FILE: rideService\src\main\java\com\flashCab\rideService\model\RideStatus.java
 ========================================================================
 package com.flashCab.rideService.model;
@@ -6451,6 +7247,7 @@ public enum RideStatus {
     COMPLETED,
     CANCELLED
 }
+========================================================================
 FILE: rideService\src\main\java\com\flashCab\rideService\model\VehicleType.java
 ========================================================================
 package com.flashCab.rideService.model;
@@ -6462,6 +7259,7 @@ public enum VehicleType {
     PREMIUM,
     BIKE
 }
+========================================================================
 FILE: rideService\src\main\java\com\flashCab\rideService\repository\RideRepository.java
 ========================================================================
 package com.flashCab.rideService.repository;
@@ -6474,6 +7272,7 @@ import java.util.List;
 public interface RideRepository extends JpaRepository<Ride, String> {
     List<Ride> findByRiderIdOrderByCreatedAtDesc(String riderId);
 }
+========================================================================
 FILE: rideService\src\main\java\com\flashCab\rideService\RideServiceApplication.java
 ========================================================================
 package com.flashCab.rideService;
@@ -6491,6 +7290,7 @@ public class RideServiceApplication {
 	}
 
 }
+========================================================================
 FILE: rideService\src\main\java\com\flashCab\rideService\service\RideEventConsumer.java
 ========================================================================
 package com.flashCab.rideService.service;
@@ -6515,6 +7315,7 @@ public class RideEventConsumer {
     }
 
 }
+========================================================================
 FILE: rideService\src\main\java\com\flashCab\rideService\service\RideService.java
 ========================================================================
 package com.flashCab.rideService.service;
@@ -6888,6 +7689,7 @@ public class RideService {
         return response;
     }
 }
+========================================================================
 FILE: rideService\src\main\java\com\flashCab\rideService\service\VehicleFarePolicy.java
 ========================================================================
 package com.flashCab.rideService.service;
@@ -6949,6 +7751,7 @@ public class VehicleFarePolicy {
         };
     }
 }
+========================================================================
 FILE: rideService\src\main\resources\application.yaml
 ========================================================================
 spring:
@@ -6957,7 +7760,7 @@ spring:
   datasource:
     url: jdbc:mysql://localhost:3306/flashcab_rides
     username: root
-    password: <REDACTED>
+    password=<REDACTED>
     driver-class-name: com.mysql.cj.jdbc.Driver
 
   jpa:
@@ -7021,91 +7824,7 @@ management:
 
 server:
   port: 8083
-FILE: rideService\src\test\java\com\flashCab\rideService\RideDriverAvailabilityTests.java
 ========================================================================
-package com.flashCab.rideService;
-
-import com.flashCab.rideService.client.DriverServiceClient;
-import com.flashCab.rideService.client.LocationServiceClient;
-import com.flashCab.rideService.client.OpenMeteoWeatherClient;
-import com.flashCab.rideService.client.RiderServiceClient;
-import com.flashCab.rideService.event.RideRequestedEvent;
-import com.flashCab.rideService.model.Ride;
-import com.flashCab.rideService.model.RideStatus;
-import com.flashCab.rideService.repository.RideRepository;
-import com.flashCab.rideService.service.RideService;
-import com.flashCab.rideService.service.VehicleFarePolicy;
-import org.junit.jupiter.api.Test;
-import org.springframework.kafka.core.KafkaTemplate;
-
-import java.util.Optional;
-
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.*;
-
-class RideDriverAvailabilityTests {
-
-    private final RideRepository rideRepository = mock(RideRepository.class);
-    @SuppressWarnings("unchecked")
-    private final KafkaTemplate<String, RideRequestedEvent> kafkaTemplate = mock(KafkaTemplate.class);
-    private final RiderServiceClient riderServiceClient = mock(RiderServiceClient.class);
-    private final DriverServiceClient driverServiceClient = mock(DriverServiceClient.class);
-    private final LocationServiceClient locationServiceClient = mock(LocationServiceClient.class);
-    private final VehicleFarePolicy vehicleFarePolicy = mock(VehicleFarePolicy.class);
-    private final OpenMeteoWeatherClient openMeteoWeatherClient = mock(OpenMeteoWeatherClient.class);
-    private final RideService rideService = new RideService(
-            rideRepository,
-            kafkaTemplate,
-            riderServiceClient,
-            driverServiceClient,
-            locationServiceClient,
-            vehicleFarePolicy,
-            openMeteoWeatherClient);
-
-    @Test
-    void completingRideReleasesItsAssignedDriver() {
-        Ride ride = rideWithStatus(RideStatus.RIDE_STARTED, "driver-1");
-        when(rideRepository.findById("ride-1")).thenReturn(Optional.of(ride));
-        when(rideRepository.save(any(Ride.class))).thenAnswer(invocation -> invocation.getArgument(0));
-        when(locationServiceClient.releaseDriver("driver-1", "ride-1")).thenReturn(true);
-
-        rideService.completeRide("ride-1");
-
-        verify(locationServiceClient).releaseDriver("driver-1", "ride-1");
-    }
-
-    @Test
-    void cancellingUnmatchedRideDoesNotReleaseAnyDriver() {
-        Ride ride = rideWithStatus(RideStatus.MATCHING, null);
-        when(rideRepository.findById("ride-1")).thenReturn(Optional.of(ride));
-        when(rideRepository.save(any(Ride.class))).thenAnswer(invocation -> invocation.getArgument(0));
-
-        rideService.cancelRide("ride-1");
-
-        verifyNoInteractions(locationServiceClient);
-    }
-
-    @Test
-    void cancellingAssignedRideReleasesOnlyItsReservation() {
-        Ride ride = rideWithStatus(RideStatus.ACCEPTED, "driver-1");
-        when(rideRepository.findById("ride-1")).thenReturn(Optional.of(ride));
-        when(rideRepository.save(any(Ride.class))).thenAnswer(invocation -> invocation.getArgument(0));
-        when(locationServiceClient.releaseDriver("driver-1", "ride-1")).thenReturn(true);
-
-        rideService.cancelRide("ride-1");
-
-        verify(locationServiceClient).releaseDriver("driver-1", "ride-1");
-        verifyNoMoreInteractions(locationServiceClient);
-    }
-
-    private Ride rideWithStatus(RideStatus status, String driverId) {
-        Ride ride = new Ride();
-        ride.setId("ride-1");
-        ride.setStatus(status);
-        ride.setDriverId(driverId);
-        return ride;
-    }
-}
 FILE: rideService\src\test\java\com\flashCab\rideService\RideServiceApplicationTests.java
 ========================================================================
 package com.flashCab.rideService;
@@ -7121,112 +7840,86 @@ class RideServiceApplicationTests {
 	}
 
 }
-FILE: gatewayService\pom.xml
 ========================================================================
-<?xml version="1.0" encoding="UTF-8"?>
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
-	<modelVersion>4.0.0</modelVersion>
-	<parent>
-		<groupId>org.springframework.boot</groupId>
-		<artifactId>spring-boot-starter-parent</artifactId>
-		<version>4.1.2</version>
-		<relativePath/>
-	</parent>
-	<groupId>com.flashcab.gatewayService</groupId>
-	<artifactId>gatewayService</artifactId>
-	<version>0.0.1-SNAPSHOT</version>
-	<name/>
-	<description/>
-	<url/>
-	<licenses>
-		<license/>
-	</licenses>
-	<developers>
-		<developer/>
-	</developers>
-	<scm>
-		<connection/>
-		<developerConnection/>
-		<tag/>
-		<url/>
-	</scm>
-	<properties>
-		<java.version>17</java.version>
-		<spring-cloud.version>2025.1.4</spring-cloud.version>
-	</properties>
-	<dependencies>
-		<dependency>
-			<groupId>org.springframework.cloud</groupId>
-			<artifactId>spring-cloud-starter-gateway-server-webflux</artifactId>
-		</dependency>
-		<dependency>
-			<groupId>org.springframework.boot</groupId>
-			<artifactId>spring-boot-starter-test</artifactId>
-			<scope>test</scope>
-		</dependency>
-	</dependencies>
-	<dependencyManagement>
-		<dependencies>
-			<dependency>
-				<groupId>org.springframework.cloud</groupId>
-				<artifactId>spring-cloud-dependencies</artifactId>
-				<version>${spring-cloud.version}</version>
-				<type>pom</type>
-				<scope>import</scope>
-			</dependency>
-		</dependencies>
-	</dependencyManagement>
-	<build>
-		<plugins>
-			<plugin>
-				<groupId>org.springframework.boot</groupId>
-				<artifactId>spring-boot-maven-plugin</artifactId>
-			</plugin>
-		</plugins>
-	</build>
-</project>
-FILE: gatewayService\src\main\java\com\flashcab\gatewayService\gatewayService\GatewayServiceApplication.java
+FILE: rideService\src\test\java\com\flashCab\rideService\service\RideServiceFareEstimateTests.java
 ========================================================================
-package com.flashcab.gatewayService.gatewayService;
+package com.flashCab.rideService.service;
 
-import org.springframework.boot.SpringApplication;
-import org.springframework.boot.autoconfigure.SpringBootApplication;
+import com.flashCab.rideService.client.DriverServiceClient;
+import com.flashCab.rideService.client.LocationServiceClient;
+import com.flashCab.rideService.client.OpenMeteoWeatherClient;
+import com.flashCab.rideService.client.RiderServiceClient;
+import com.flashCab.rideService.dto.OpenMeteoWeatherResponse;
+import com.flashCab.rideService.dto.RideRequest;
+import com.flashCab.rideService.model.VehicleType;
+import com.flashCab.rideService.repository.RideRepository;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.kafka.core.KafkaTemplate;
+import org.springframework.test.util.ReflectionTestUtils;
 
-@SpringBootApplication
-public class GatewayServiceApplication {
+import java.time.LocalTime;
 
-	public static void main(String[] args) {
-		SpringApplication.run(GatewayServiceApplication.class, args);
-	}
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
+class RideServiceFareEstimateTests {
+
+    private final VehicleFarePolicy vehicleFarePolicy = mock(VehicleFarePolicy.class);
+    private final OpenMeteoWeatherClient weatherClient = mock(OpenMeteoWeatherClient.class);
+    private final RideService rideService = new RideService(
+            mock(RideRepository.class),
+            mock(KafkaTemplate.class),
+            mock(RiderServiceClient.class),
+            mock(DriverServiceClient.class),
+            mock(LocationServiceClient.class),
+            vehicleFarePolicy,
+            weatherClient);
+
+    @BeforeEach
+    void setUp() {
+        when(vehicleFarePolicy.getBaseFare(VehicleType.SEDAN)).thenReturn(50.0);
+        when(vehicleFarePolicy.getPerKmRate(VehicleType.SEDAN)).thenReturn(12.0);
+        when(vehicleFarePolicy.getBaseFare(VehicleType.BIKE)).thenReturn(20.0);
+        when(vehicleFarePolicy.getPerKmRate(VehicleType.BIKE)).thenReturn(6.0);
+
+        OpenMeteoWeatherResponse.Current current = new OpenMeteoWeatherResponse.Current();
+        current.setWeatherCode(0);
+        current.setPrecipitation(0.0);
+        current.setRain(0.0);
+        OpenMeteoWeatherResponse weather = new OpenMeteoWeatherResponse();
+        weather.setCurrent(current);
+        when(weatherClient.getCurrentWeather(0.0, 0.0)).thenReturn(weather);
+    }
+
+    @Test
+    void calculatesExpectedFareForSedanRide() {
+        double fare = estimateFare(VehicleType.SEDAN);
+
+        assertEquals(1384.34, fare, 0.01);
+    }
+
+    @Test
+    void calculatesExpectedFareForBikeRide() {
+        double fare = estimateFare(VehicleType.BIKE);
+
+        assertEquals(687.17, fare, 0.01);
+    }
+
+    private double estimateFare(VehicleType vehicleType) {
+        RideRequest request = new RideRequest();
+        request.setPickupLatitude(0.0);
+        request.setPickupLongitude(0.0);
+        request.setDropLatitude(0.0);
+        request.setDropLongitude(1.0);
+        request.setVehicleType(vehicleType);
+
+        return ReflectionTestUtils.invokeMethod(
+                rideService,
+                "calculateEstimateFare",
+                request,
+                LocalTime.of(12, 0));
+    }
 }
-FILE: gatewayService\src\main\resources\application.yaml
 ========================================================================
-spring:
-  application:
-    name: gatewayService
-  cloud:
-    gateway:
-      server:
-        webflux:
-          routes:
-            - id: riders
-              uri: http://localhost:8086
-              predicates:
-                - Path=/api/v1/riders/**
-            - id: drivers
-              uri: http://localhost:8085
-              predicates:
-                - Path=/api/v1/drivers/**
-            - id: locations
-              uri: http://localhost:8082
-              predicates:
-                - Path=/api/v1/locations/**
-            - id: rides
-              uri: http://localhost:8083
-              predicates:
-                - Path=/api/v1/rides/**
-
-server:
-  port: 8081

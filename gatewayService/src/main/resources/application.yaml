@@ -22,6 +22,44 @@ spring:
               uri: http://localhost:8083
               predicates:
                 - Path=/api/v1/rides/**
+            - id: rider-openapi
+              uri: http://localhost:8086
+              predicates:
+                - Path=/rider-service/v3/api-docs/**
+              filters:
+                - StripPrefix=1
+            - id: driver-openapi
+              uri: http://localhost:8085
+              predicates:
+                - Path=/driver-service/v3/api-docs/**
+              filters:
+                - StripPrefix=1
+            - id: location-openapi
+              uri: http://localhost:8082
+              predicates:
+                - Path=/location-service/v3/api-docs/**
+              filters:
+                - StripPrefix=1
+            - id: ride-openapi
+              uri: http://localhost:8083
+              predicates:
+                - Path=/ride-service/v3/api-docs/**
+              filters:
+                - StripPrefix=1
+
+springdoc:
+  swagger-ui:
+    disable-swagger-default-url: true
+    urls-primary-name: Rider Service
+    urls:
+      - name: Rider Service
+        url: /rider-service/v3/api-docs
+      - name: Driver Service
+        url: /driver-service/v3/api-docs
+      - name: Location Service
+        url: /location-service/v3/api-docs
+      - name: Ride Service
+        url: /ride-service/v3/api-docs
 
 server:
   port: 8081
