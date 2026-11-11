@@ -1,0 +1,61 @@
+
+# Help files
+HELP.md
+
+# Maven
+**/target/
+
+# Keep Maven Wrapper files
+# Do not ignore .mvn or mvnw / mvnw.cmd
+
+# Gradle
+**/.gradle/
+**/build/
+
+# Environment variables and secrets
+.env
+.env.*
+!.env.example
+**/.env
+**/.env.*
+!**/.env.example
+
+# Private keys and certificates
+*.pem
+*.key
+
+# Logs
+*.log
+**/logs/
+
+# Compiled Java files
+*.class
+
+# STS / Eclipse
+.apt_generated/
+.classpath
+.factorypath
+.project
+.settings/
+.springBeans
+.sts4-cache/
+
+# IntelliJ IDEA
+.idea/
+*.iws
+*.iml
+*.ipr
+
+# NetBeans
+**/nbproject/private/
+**/nbbuild/
+**/dist/
+**/nbdist/
+**/.nb-gradle/
+
+# VS Code
+.vscode/
+
+# OS files
+.DS_Store
+Thumbs.db
