@@ -46,6 +46,7 @@ public class RideService {
         log.info("New ride request from rider: {}", request.getRiderId());
         LocalTime bookingTime = LocalTime.now(BOOKING_TIME_ZONE);
         validateRiderExists(request.getRiderId());
+        ensureDriversAvailable(request);
 
         Ride ride = new Ride();
         ride.setRiderId(request.getRiderId());
@@ -218,6 +219,18 @@ public class RideService {
         } catch (FeignException e) {
             log.error("Unable to validate rider {} from Rider Service: {}", riderId, e.getMessage());
             throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "Rider Service is unavailable");
+        }
+    }
+
+    private void ensureDriversAvailable(RideRequest request) {
+        try {
+            var drivers = locationServiceClient.getNearByDrivers(
+                    request.getPickupLatitude(), request.getPickupLongitude(), 100.0);
+            if (drivers == null || drivers.isEmpty()) {
+                throw new ResponseStatusException(HttpStatus.NOT_FOUND, "No drivers available nearby");
+            }
+        } catch (FeignException e) {
+            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "Location Service is unavailable");
         }
     }
 
