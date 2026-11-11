@@ -59,3 +59,8 @@ HELP.md
 # OS files
 .DS_Store
 Thumbs.db
+
+
+
+# Project code dump
+/FlashCab-project-code.txt
