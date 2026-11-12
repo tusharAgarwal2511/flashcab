@@ -25,6 +25,7 @@ import java.util.List;
 @Tag(name = "Riders", description = "Rider registration and profile management")
 public class RiderController {
 
+    private static final String AUTH_USER_ID_HEADER = "X-Authenticated-User-Id";
     private final RiderService riderService;
 
     @PostMapping
@@ -36,16 +37,19 @@ public class RiderController {
                     content = @Content(schema = @Schema(implementation = RiderRequest.class))))
     @ApiResponses(@ApiResponse(responseCode = "201", description = "Rider registered",
             content = @Content(schema = @Schema(implementation = RiderResponse.class))))
-    public ResponseEntity<RiderResponse> registerRider(@Valid @RequestBody RiderRequest request) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(riderService.registerRider(request));
+    public ResponseEntity<RiderResponse> registerRider(
+            @RequestHeader(AUTH_USER_ID_HEADER) String authUserId,
+            @Valid @RequestBody RiderRequest request) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(riderService.registerRider(request, authUserId));
     }
 
     @GetMapping
     @Operation(summary = "List riders", description = "Returns all registered riders.")
     @ApiResponses(@ApiResponse(responseCode = "200", description = "Rider list",
             content = @Content(array = @ArraySchema(schema = @Schema(implementation = RiderResponse.class)))))
-    public ResponseEntity<List<RiderResponse>> getAllRiders() {
-        return ResponseEntity.ok(riderService.getAllRiders());
+    public ResponseEntity<List<RiderResponse>> getAllRiders(
+            @RequestHeader(AUTH_USER_ID_HEADER) String authUserId) {
+        return ResponseEntity.ok(riderService.getRidersForUser(authUserId));
     }
 
     @GetMapping("/{riderId}")
@@ -53,8 +57,9 @@ public class RiderController {
     @ApiResponses(@ApiResponse(responseCode = "200", description = "Rider profile",
             content = @Content(schema = @Schema(implementation = RiderResponse.class))))
     public ResponseEntity<RiderResponse> getRiderById(
+            @RequestHeader(AUTH_USER_ID_HEADER) String authUserId,
             @Parameter(description = "Identifier of the rider", required = true) @PathVariable String riderId) {
-        return ResponseEntity.ok(riderService.getRiderById(riderId));
+        return ResponseEntity.ok(riderService.getRiderById(riderId, authUserId));
     }
 
     @PutMapping("/{riderId}")
@@ -67,17 +72,19 @@ public class RiderController {
     @ApiResponses(@ApiResponse(responseCode = "200", description = "Updated rider profile",
             content = @Content(schema = @Schema(implementation = RiderResponse.class))))
     public ResponseEntity<RiderResponse> updateRider(
+            @RequestHeader(AUTH_USER_ID_HEADER) String authUserId,
             @Parameter(description = "Identifier of the rider", required = true) @PathVariable String riderId,
             @Valid @RequestBody RiderRequest request) {
-        return ResponseEntity.ok(riderService.updateRider(riderId, request));
+        return ResponseEntity.ok(riderService.updateRider(riderId, authUserId, request));
     }
 
     @DeleteMapping("/{riderId}")
     @Operation(summary = "Delete a rider", description = "Deletes the rider with the specified identifier.")
     @ApiResponses(@ApiResponse(responseCode = "204", description = "Rider deleted"))
     public ResponseEntity<Void> deleteRider(
+            @RequestHeader(AUTH_USER_ID_HEADER) String authUserId,
             @Parameter(description = "Identifier of the rider", required = true) @PathVariable String riderId) {
-        riderService.deleteRider(riderId);
+        riderService.deleteRider(riderId, authUserId);
         return ResponseEntity.noContent().build();
     }
 }

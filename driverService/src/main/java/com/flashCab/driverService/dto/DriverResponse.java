@@ -14,6 +14,8 @@ public class DriverResponse {
 
     private String id;
 
+    private String authUserId;
+
     private String name;
 
     private String email;

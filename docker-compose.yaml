@@ -1,59 +1,239 @@
 services:
-  # REDIS 
-  redis:
-    image: redis:latest
-    container_name: redis-geo
-    ports:
-      - "${FLASHCAB_REDIS_HOST_PORT:-6379}:6379"
+  mongodb:
+    image: mongo:7
+    restart: unless-stopped
+    volumes:
+      - mongodb-data:/data/db
     networks:
       - flashcab
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
-  # MYSQL
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis-data:/data
+    networks:
+      - flashcab
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
   mysql:
-    image: mysql:latest
-    container_name: mysql
+    image: mysql:8.4
+    restart: unless-stopped
     environment:
-      MYSQL_ROOT_PASSWORD: ${FLASHCAB_MYSQL_ROOT_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${FLASHCAB_MYSQL_ROOT_PASSWORD:?Set FLASHCAB_MYSQL_ROOT_PASSWORD in the root .env}
       MYSQL_DATABASE: flashcab_rides
-    ports:
-      - "3306:3306"
+      MYSQL_USER: flashcab_ride
+      MYSQL_PASSWORD: ${FLASHCAB_MYSQL_APP_PASSWORD:?Set FLASHCAB_MYSQL_APP_PASSWORD in the root .env}
     volumes:
       - mysql-data:/var/lib/mysql
     networks:
       - flashcab
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -p$${MYSQL_ROOT_PASSWORD} --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
 
-  # ZOOKEEPER 
   zookeeper:
     image: confluentinc/cp-zookeeper:7.4.0
-    container_name: zookeeper
-    ports:
-      - "${FLASHCAB_ZOOKEEPER_HOST_PORT:-2181}:2181"
+    restart: unless-stopped
     environment:
       ZOOKEEPER_CLIENT_PORT: 2181
       ZOOKEEPER_TICK_TIME: 2000
+      ZOOKEEPER_4LW_COMMANDS_WHITELIST: ruok
     networks:
       - flashcab
+    healthcheck:
+      test: ["CMD-SHELL", "echo ruok | nc -w 2 localhost 2181 | grep imok"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
 
-  # KAFKA 
   kafka:
     image: confluentinc/cp-kafka:7.4.0
-    container_name: kafka
+    restart: unless-stopped
     depends_on:
-      - zookeeper
-    ports:
-      - "${FLASHCAB_KAFKA_HOST_PORT:-9092}:9092"
+      zookeeper:
+        condition: service_healthy
     environment:
       KAFKA_BROKER_ID: 1
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://${FLASHCAB_KAFKA_ADVERTISED_HOST:-localhost}:${FLASHCAB_KAFKA_HOST_PORT:-9092}
-      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_LISTENERS: INTERNAL://0.0.0.0:29092,HOST://0.0.0.0:9092
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka:29092,HOST://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INTERNAL:PLAINTEXT,HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
     networks:
       - flashcab
+    healthcheck:
+      test: ["CMD-SHELL", "kafka-broker-api-versions --bootstrap-server localhost:29092"]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+
+  rider-service:
+    build:
+      context: .
+      dockerfile: riderService/Dockerfile
+    restart: unless-stopped
+    env_file:
+      - path: ./riderService/.env
+        required: false
+    environment:
+      RIDER_SERVER_PORT: ${RIDER_SERVER_PORT:-8086}
+      RIDER_MONGODB_URI: ${RIDER_MONGODB_URI:-mongodb://mongodb:27017/flashcab_riders}
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    networks:
+      - flashcab
+
+  driver-service:
+    build:
+      context: .
+      dockerfile: driverService/Dockerfile
+    restart: unless-stopped
+    env_file:
+      - path: ./driverService/.env
+        required: false
+    environment:
+      DRIVER_SERVER_PORT: ${DRIVER_SERVER_PORT:-8085}
+      DRIVER_MONGODB_URI: ${DRIVER_MONGODB_URI:-mongodb://mongodb:27017/flashcab_drivers}
+      DRIVER_LOCATION_SERVICE_URL: ${DRIVER_LOCATION_SERVICE_URL:-http://location-service:8082}
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    networks:
+      - flashcab
+
+  location-service:
+    build:
+      context: .
+      dockerfile: locationService/Dockerfile
+    restart: unless-stopped
+    env_file:
+      - path: ./locationService/.env
+        required: false
+    environment:
+      LOCATION_SERVER_PORT: ${LOCATION_SERVER_PORT:-8082}
+      LOCATION_REDIS_HOST: ${LOCATION_REDIS_HOST:-redis}
+      LOCATION_REDIS_PORT: ${LOCATION_REDIS_PORT:-6379}
+      LOCATION_DRIVER_SERVICE_URL: ${LOCATION_DRIVER_SERVICE_URL:-http://driver-service:8085}
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - flashcab
+
+  ride-service:
+    build:
+      context: .
+      dockerfile: rideService/Dockerfile
+    restart: unless-stopped
+    env_file:
+      - path: ./rideService/.env
+        required: false
+    environment:
+      RIDE_SERVER_PORT: ${RIDE_SERVER_PORT:-8083}
+      RIDE_MYSQL_URL: ${RIDE_MYSQL_URL:-jdbc:mysql://mysql:3306/flashcab_rides}
+      RIDE_MYSQL_USERNAME: ${RIDE_MYSQL_USERNAME:-flashcab_ride}
+      RIDE_MYSQL_PASSWORD: ${FLASHCAB_MYSQL_APP_PASSWORD:?Set FLASHCAB_MYSQL_APP_PASSWORD in the root .env}
+      RIDE_JPA_DDL_AUTO: ${RIDE_JPA_DDL_AUTO:-update}
+      RIDE_KAFKA_BOOTSTRAP_SERVERS: ${RIDE_KAFKA_BOOTSTRAP_SERVERS:-kafka:29092}
+      RIDE_RIDER_SERVICE_URL: ${RIDE_RIDER_SERVICE_URL:-http://rider-service:8086}
+      RIDE_DRIVER_SERVICE_URL: ${RIDE_DRIVER_SERVICE_URL:-http://driver-service:8085}
+      RIDE_LOCATION_SERVICE_URL: ${RIDE_LOCATION_SERVICE_URL:-http://location-service:8082}
+      RIDE_OPEN_METEO_BASE_URL: ${RIDE_OPEN_METEO_BASE_URL:-https://api.open-meteo.com}
+    depends_on:
+      mysql:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    networks:
+      - flashcab
+
+  matching-service:
+    build:
+      context: .
+      dockerfile: matchingService/Dockerfile
+    restart: unless-stopped
+    env_file:
+      - path: ./matchingService/.env
+        required: false
+    environment:
+      MATCHING_SERVER_PORT: ${MATCHING_SERVER_PORT:-8084}
+      MATCHING_KAFKA_BOOTSTRAP_SERVERS: ${MATCHING_KAFKA_BOOTSTRAP_SERVERS:-kafka:29092}
+      MATCHING_LOCATION_SERVICE_URL: ${MATCHING_LOCATION_SERVICE_URL:-http://location-service:8082}
+      MATCHING_DRIVER_SERVICE_URL: ${MATCHING_DRIVER_SERVICE_URL:-http://driver-service:8085}
+    depends_on:
+      kafka:
+        condition: service_healthy
+    networks:
+      - flashcab
+
+  auth-service:
+    build:
+      context: .
+      dockerfile: authService/Dockerfile
+    restart: unless-stopped
+    env_file:
+      - path: ./authService/.env
+        required: false
+    environment:
+      AUTH_SERVER_PORT: ${AUTH_SERVER_PORT:-8087}
+      AUTH_MONGODB_URI: ${AUTH_MONGODB_URI:-mongodb://mongodb:27017/flashcab_auth}
+      AUTH_JWT_SECRET: ${AUTH_JWT_SECRET:?Set AUTH_JWT_SECRET in the root .env or VM environment}
+      AUTH_JWT_EXPIRATION_SECONDS: ${AUTH_JWT_EXPIRATION_SECONDS:-3600}
+      AUTH_RIDER_SERVICE_URL: ${AUTH_RIDER_SERVICE_URL:-http://rider-service:8086}
+      AUTH_DRIVER_SERVICE_URL: ${AUTH_DRIVER_SERVICE_URL:-http://driver-service:8085}
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    networks:
+      - flashcab
+
+  gateway-service:
+    build:
+      context: .
+      dockerfile: gatewayService/Dockerfile
+    restart: unless-stopped
+    env_file:
+      - path: ./gatewayService/.env
+        required: false
+    environment:
+      GATEWAY_SERVER_PORT: ${GATEWAY_SERVER_PORT:-8081}
+      GATEWAY_RIDER_SERVICE_URL: ${GATEWAY_RIDER_SERVICE_URL:-http://rider-service:8086}
+      GATEWAY_DRIVER_SERVICE_URL: ${GATEWAY_DRIVER_SERVICE_URL:-http://driver-service:8085}
+      GATEWAY_LOCATION_SERVICE_URL: ${GATEWAY_LOCATION_SERVICE_URL:-http://location-service:8082}
+      GATEWAY_RIDE_SERVICE_URL: ${GATEWAY_RIDE_SERVICE_URL:-http://ride-service:8083}
+      GATEWAY_AUTH_SERVICE_URL: ${GATEWAY_AUTH_SERVICE_URL:-http://auth-service:8087}
+      GATEWAY_JWT_SECRET: ${GATEWAY_JWT_SECRET:?Set GATEWAY_JWT_SECRET in the root .env or VM environment}
+    depends_on:
+      - rider-service
+      - driver-service
+      - location-service
+      - ride-service
+      - matching-service
+      - auth-service
+    ports:
+      - "8081:8081"
+    networks:
+      - flashcab
 
 volumes:
+  mongodb-data:
+  redis-data:
   mysql-data:
 
 networks:

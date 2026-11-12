@@ -24,6 +24,10 @@ spring:
               uri: "${GATEWAY_RIDE_SERVICE_URL:http://localhost:8083}"
               predicates:
                 - Path=/api/v1/rides/**
+            - id: auth
+              uri: "${GATEWAY_AUTH_SERVICE_URL:http://localhost:8087}"
+              predicates:
+                - Path=/auth/**
             - id: rider-openapi
               uri: "${GATEWAY_RIDER_SERVICE_URL:http://localhost:8086}"
               predicates:

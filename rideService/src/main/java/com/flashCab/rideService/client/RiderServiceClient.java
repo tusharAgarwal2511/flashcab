@@ -8,6 +8,9 @@ import org.springframework.web.bind.annotation.PathVariable;
 @FeignClient(name = "riderService", url = "${rider.service.url}")
 public interface RiderServiceClient {
 
-    @GetMapping("/api/v1/riders/{riderId}")
+    @GetMapping("/internal/riders/{riderId}")
     RiderResponse getRiderById(@PathVariable("riderId") String riderId);
+
+    @GetMapping("/internal/riders/by-auth-user/{authUserId}")
+    RiderResponse getRiderByAuthUserId(@PathVariable("authUserId") String authUserId);
 }

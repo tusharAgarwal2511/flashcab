@@ -10,9 +10,12 @@ import java.util.List;
 @FeignClient(name = "driverService", url = "${driver.service.url}")
 public interface DriverServiceClient {
 
-    @GetMapping("/api/v1/drivers/{driverId}")
+    @GetMapping("/internal/drivers/{driverId}")
     DriverResponse getDriverById(@PathVariable("driverId") String driverId);
 
-    @GetMapping("/api/v1/drivers")
+    @GetMapping("/internal/drivers/by-auth-user/{authUserId}")
+    DriverResponse getDriverByAuthUserId(@PathVariable("authUserId") String authUserId);
+
+    @GetMapping("/internal/drivers")
     List<DriverResponse> getDrivers();
 }

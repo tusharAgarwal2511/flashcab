@@ -24,6 +24,7 @@ import java.util.List;
 @RequiredArgsConstructor
 @Tag(name = "Locations", description = "Driver location and availability operations")
 public class LocationController {
+    private static final String AUTH_USER_ID_HEADER = "X-Authenticated-User-Id";
     private final LocationService locationService;
 
     @PostMapping("/drivers/update")
@@ -35,8 +36,10 @@ public class LocationController {
                     content = @Content(schema = @Schema(implementation = DriverLocationRequest.class))))
     @ApiResponses(@ApiResponse(responseCode = "200", description = "Location updated",
             content = @Content(mediaType = "text/plain", schema = @Schema(implementation = String.class))))
-    public ResponseEntity<String> updateDriverLocation(@RequestBody DriverLocationRequest driverLocationRequest) {
-        locationService.updateDriverLocation(driverLocationRequest);
+    public ResponseEntity<String> updateDriverLocation(
+            @RequestHeader(AUTH_USER_ID_HEADER) String authUserId,
+            @RequestBody DriverLocationRequest driverLocationRequest) {
+        locationService.updateDriverLocation(driverLocationRequest, authUserId);
         return ResponseEntity.ok("Driver location updated");
     }
 

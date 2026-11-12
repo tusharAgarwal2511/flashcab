@@ -27,6 +27,8 @@ import java.util.List;
 @Slf4j
 @Tag(name = "Rides", description = "Ride booking and lifecycle operations")
 public class RideController {
+    private static final String AUTH_USER_ID_HEADER = "X-Authenticated-User-Id";
+    private static final String AUTH_USER_ROLE_HEADER = "X-Authenticated-User-Role";
     private final RideService rideService;
 
     @PostMapping("/request")
@@ -38,9 +40,11 @@ public class RideController {
                     content = @Content(schema = @Schema(implementation = RideRequest.class))))
     @ApiResponses(@ApiResponse(responseCode = "201", description = "Ride request created",
             content = @Content(schema = @Schema(implementation = RideResponse.class))))
-    public ResponseEntity<RideResponse> requestRide(@Valid @RequestBody RideRequest request) {
-        log.info("Ride request received from rider: {}", request.getRiderId());
-        return ResponseEntity.status(HttpStatus.CREATED).body(rideService.requestRide(request));
+    public ResponseEntity<RideResponse> requestRide(
+            @RequestHeader(AUTH_USER_ID_HEADER) String authUserId,
+            @Valid @RequestBody RideRequest request) {
+        log.info("Ride request received from authenticated user: {}", authUserId);
+        return ResponseEntity.status(HttpStatus.CREATED).body(rideService.requestRide(request, authUserId));
     }
 
     @GetMapping("/{rideId}")
@@ -48,8 +52,10 @@ public class RideController {
     @ApiResponses(@ApiResponse(responseCode = "200", description = "Ride details",
             content = @Content(schema = @Schema(implementation = RideResponse.class))))
     public ResponseEntity<RideResponse> getRideById(
+            @RequestHeader(AUTH_USER_ID_HEADER) String authUserId,
+            @RequestHeader(AUTH_USER_ROLE_HEADER) String role,
             @Parameter(description = "Identifier of the ride", required = true) @PathVariable String rideId) {
-        return ResponseEntity.ok(rideService.getRideById(rideId));
+        return ResponseEntity.ok(rideService.getRideById(rideId, authUserId, role));
     }
 
     @GetMapping("/rider/{riderId}")
@@ -57,8 +63,9 @@ public class RideController {
     @ApiResponses(@ApiResponse(responseCode = "200", description = "Rides for the rider",
             content = @Content(array = @ArraySchema(schema = @Schema(implementation = RideResponse.class)))))
     public ResponseEntity<List<RideResponse>> getRidesByRider(
+            @RequestHeader(AUTH_USER_ID_HEADER) String authUserId,
             @Parameter(description = "Identifier of the rider", required = true) @PathVariable String riderId) {
-        return ResponseEntity.ok(rideService.getRidesByRider(riderId));
+        return ResponseEntity.ok(rideService.getRidesByRider(riderId, authUserId));
     }
 
     @PutMapping("/{rideId}/start")
@@ -66,8 +73,9 @@ public class RideController {
     @ApiResponses(@ApiResponse(responseCode = "200", description = "Updated ride details",
             content = @Content(schema = @Schema(implementation = RideResponse.class))))
     public ResponseEntity<RideResponse> startRide(
+            @RequestHeader(AUTH_USER_ID_HEADER) String authUserId,
             @Parameter(description = "Identifier of the ride", required = true) @PathVariable String rideId) {
-        return ResponseEntity.ok(rideService.startRide(rideId));
+        return ResponseEntity.ok(rideService.startRide(rideId, authUserId));
     }
 
     @PutMapping("/{rideId}/complete")
@@ -75,8 +83,9 @@ public class RideController {
     @ApiResponses(@ApiResponse(responseCode = "200", description = "Updated ride details",
             content = @Content(schema = @Schema(implementation = RideResponse.class))))
     public ResponseEntity<RideResponse> completeRide(
+            @RequestHeader(AUTH_USER_ID_HEADER) String authUserId,
             @Parameter(description = "Identifier of the ride", required = true) @PathVariable String rideId) {
-        return ResponseEntity.ok(rideService.completeRide(rideId));
+        return ResponseEntity.ok(rideService.completeRide(rideId, authUserId));
     }
 
     @PutMapping("/{rideId}/cancel")
@@ -84,7 +93,8 @@ public class RideController {
     @ApiResponses(@ApiResponse(responseCode = "200", description = "Updated ride details",
             content = @Content(schema = @Schema(implementation = RideResponse.class))))
     public ResponseEntity<RideResponse> cancelRide(
+            @RequestHeader(AUTH_USER_ID_HEADER) String authUserId,
             @Parameter(description = "Identifier of the ride", required = true) @PathVariable String rideId) {
-        return ResponseEntity.ok(rideService.cancelRide(rideId));
+        return ResponseEntity.ok(rideService.cancelRide(rideId, authUserId));
     }
 }

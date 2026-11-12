@@ -52,26 +52,34 @@ public class LocationService {
     private final RedisTemplate<String, String> redisTemplate;
     private final DriverServiceClient driverServiceClient;
 
-    public void updateDriverLocation(DriverLocationRequest driverLocationRequest) {
+    public void updateDriverLocation(DriverLocationRequest driverLocationRequest, String authUserId) {
         if (driverLocationRequest == null || driverLocationRequest.getDriverId() == null || driverLocationRequest.getDriverId().isBlank()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Driver ID is required");
         }
+        if (authUserId == null || authUserId.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Authenticated user is required");
+        }
+        DriverResponse driver;
         try {
-            DriverResponse driver = driverServiceClient.getDriverById(driverLocationRequest.getDriverId());
-            if (driver == null || driver.getId() == null) {
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Driver does not exist");
-            }
+            driver = driverServiceClient.getDriverByAuthUserId(authUserId);
         } catch (FeignException.NotFound e) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Driver does not exist");
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "No driver profile belongs to this account");
         } catch (FeignException e) {
-            log.error("Driver validation failed for {}: {}", driverLocationRequest.getDriverId(), e.getMessage());
+            log.error("Driver validation failed for authenticated user {}: {}", authUserId, e.getMessage());
             throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "Driver Service is unavailable");
         }
-        log.info("Updating location for driver: {}", driverLocationRequest.getDriverId());
+        if (driver == null || driver.getId() == null) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "No driver profile belongs to this account");
+        }
+        if (!driver.getId().equals(driverLocationRequest.getDriverId())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Driver ID does not belong to this account");
+        }
+        String driverId = driver.getId();
+        log.info("Updating location for driver: {}", driverId);
         Point driverPoint = new Point(driverLocationRequest.getLongitude(), driverLocationRequest.getLatitude());
-        redisTemplate.opsForGeo().add(DRIVERS_GEO_KEY, driverPoint, driverLocationRequest.getDriverId());
-        initializeAvailability(driverLocationRequest.getDriverId());
-        log.info("Location updated for driver: {}", driverLocationRequest.getDriverId());
+        redisTemplate.opsForGeo().add(DRIVERS_GEO_KEY, driverPoint, driverId);
+        initializeAvailability(driverId);
+        log.info("Location updated for driver: {}", driverId);
     }
 
     public int seedDrivers(int count, double minLat, double maxLat, double minLon, double maxLon) {

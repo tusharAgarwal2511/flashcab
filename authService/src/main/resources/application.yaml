@@ -1,0 +1,22 @@
+spring:
+  application:
+    name: authService
+  config:
+    import: optional:file:./.env[.properties]
+  mongodb:
+    uri: "${AUTH_MONGODB_URI:mongodb://localhost:27017/flashcab_auth}"
+  data:
+    mongodb:
+      auto-index-creation: true
+
+server:
+  port: "${AUTH_SERVER_PORT:8087}"
+
+auth:
+  jwt:
+    secret: "${AUTH_JWT_SECRET}"
+    expiration-seconds: "${AUTH_JWT_EXPIRATION_SECONDS:3600}"
+  rider-service:
+    url: "${AUTH_RIDER_SERVICE_URL:http://localhost:8086}"
+  driver-service:
+    url: "${AUTH_DRIVER_SERVICE_URL:http://localhost:8085}"

@@ -5,6 +5,9 @@ spring:
     import: optional:file:./.env[.properties]
   mongodb:
     uri: "${RIDER_MONGODB_URI:mongodb://localhost:27017/flashcab_riders}"
+  data:
+    mongodb:
+      auto-index-creation: true
 
 server:
   port: "${RIDER_SERVER_PORT:8086}"

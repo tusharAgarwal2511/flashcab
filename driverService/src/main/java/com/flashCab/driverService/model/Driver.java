@@ -4,6 +4,7 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.time.LocalDateTime;
@@ -16,6 +17,9 @@ public class Driver {
 
     @Id
     private String id;
+
+    @Indexed(unique = true, sparse = true)
+    private String authUserId;
 
     private String name;
 

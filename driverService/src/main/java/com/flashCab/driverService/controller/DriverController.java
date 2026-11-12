@@ -25,6 +25,7 @@ import java.util.List;
 @Tag(name = "Drivers", description = "Driver registration and profile management")
 public class DriverController {
 
+    private static final String AUTH_USER_ID_HEADER = "X-Authenticated-User-Id";
     private final DriverService driverService;
 
     @PostMapping
@@ -36,16 +37,19 @@ public class DriverController {
                     content = @Content(schema = @Schema(implementation = DriverRequest.class))))
     @ApiResponses(@ApiResponse(responseCode = "201", description = "Driver registered",
             content = @Content(schema = @Schema(implementation = DriverResponse.class))))
-    public ResponseEntity<DriverResponse> registerDriver(@Valid @RequestBody DriverRequest request) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(driverService.registerDriver(request));
+    public ResponseEntity<DriverResponse> registerDriver(
+            @RequestHeader(AUTH_USER_ID_HEADER) String authUserId,
+            @Valid @RequestBody DriverRequest request) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(driverService.registerDriver(request, authUserId));
     }
 
     @GetMapping
     @Operation(summary = "List drivers", description = "Returns all registered drivers.")
     @ApiResponses(@ApiResponse(responseCode = "200", description = "Driver list",
             content = @Content(array = @ArraySchema(schema = @Schema(implementation = DriverResponse.class)))))
-    public ResponseEntity<List<DriverResponse>> getAllDrivers() {
-        return ResponseEntity.ok(driverService.getAllDrivers());
+    public ResponseEntity<List<DriverResponse>> getAllDrivers(
+            @RequestHeader(AUTH_USER_ID_HEADER) String authUserId) {
+        return ResponseEntity.ok(driverService.getDriversForUser(authUserId));
     }
 
     @GetMapping("/batch")
@@ -63,8 +67,9 @@ public class DriverController {
     @ApiResponses(@ApiResponse(responseCode = "200", description = "Driver profile",
             content = @Content(schema = @Schema(implementation = DriverResponse.class))))
     public ResponseEntity<DriverResponse> getDriverById(
+            @RequestHeader(AUTH_USER_ID_HEADER) String authUserId,
             @Parameter(description = "Identifier of the driver", required = true) @PathVariable String driverId) {
-        return ResponseEntity.ok(driverService.getDriverById(driverId));
+        return ResponseEntity.ok(driverService.getDriverById(driverId, authUserId));
     }
 
     @PutMapping("/{driverId}")
@@ -77,17 +82,19 @@ public class DriverController {
     @ApiResponses(@ApiResponse(responseCode = "200", description = "Updated driver profile",
             content = @Content(schema = @Schema(implementation = DriverResponse.class))))
     public ResponseEntity<DriverResponse> updateDriver(
+            @RequestHeader(AUTH_USER_ID_HEADER) String authUserId,
             @Parameter(description = "Identifier of the driver", required = true) @PathVariable String driverId,
             @Valid @RequestBody DriverRequest request) {
-        return ResponseEntity.ok(driverService.updateDriver(driverId, request));
+        return ResponseEntity.ok(driverService.updateDriver(driverId, authUserId, request));
     }
 
     @DeleteMapping("/{driverId}")
     @Operation(summary = "Delete a driver", description = "Deletes the driver with the specified identifier.")
     @ApiResponses(@ApiResponse(responseCode = "204", description = "Driver deleted"))
     public ResponseEntity<Void> deleteDriver(
+            @RequestHeader(AUTH_USER_ID_HEADER) String authUserId,
             @Parameter(description = "Identifier of the driver", required = true) @PathVariable String driverId) {
-        driverService.deleteDriver(driverId);
+        driverService.deleteDriver(driverId, authUserId);
         return ResponseEntity.noContent().build();
     }
 } 

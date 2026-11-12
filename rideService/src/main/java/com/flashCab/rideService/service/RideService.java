@@ -25,6 +25,7 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.ZoneId;
 import java.util.List;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 @Service
@@ -42,14 +43,18 @@ public class RideService {
     private final VehicleFarePolicy vehicleFarePolicy;
     private final OpenMeteoWeatherClient openMeteoWeatherClient;
 
-    public RideResponse requestRide(RideRequest request) {
-        log.info("New ride request from rider: {}", request.getRiderId());
+    public RideResponse requestRide(RideRequest request, String authUserId) {
+        com.flashCab.riderService.dto.RiderResponse rider = getRiderByAuthUserId(authUserId);
+        if (!Objects.equals(rider.getId(), request.getRiderId())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                    "Rider ID does not belong to the authenticated account");
+        }
+        log.info("New ride request from rider: {}", rider.getId());
         LocalTime bookingTime = LocalTime.now(BOOKING_TIME_ZONE);
-        validateRiderExists(request.getRiderId());
         ensureDriversAvailable(request);
 
         Ride ride = new Ride();
-        ride.setRiderId(request.getRiderId());
+        ride.setRiderId(rider.getId());
         ride.setVehicleType(request.getVehicleType());
         ride.setPickupLatitude(request.getPickupLatitude());
         ride.setPickupLongitude(request.getPickupLongitude());
@@ -130,9 +135,10 @@ public class RideService {
         rideRepository.save(ride);
     }
 
-    public RideResponse startRide(String rideId) {
+    public RideResponse startRide(String rideId, String authUserId) {
         Ride ride = rideRepository.findById(rideId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Ride not found"));
+        requireAssignedDriver(ride, authUserId);
         if (ride.getStatus() != RideStatus.ACCEPTED) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                     "Ride cannot be started, Current status: " + ride.getStatus());
@@ -143,9 +149,10 @@ public class RideService {
         return mapToResponse(ride);
     }
 
-    public RideResponse completeRide(String rideId) {
+    public RideResponse completeRide(String rideId, String authUserId) {
         Ride ride = rideRepository.findById(rideId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Ride not found"));
+        requireAssignedDriver(ride, authUserId);
         if (ride.getStatus() == RideStatus.COMPLETED) {
             releaseAssignedDriver(ride);
             return mapToResponse(ride);
@@ -162,9 +169,10 @@ public class RideService {
         return mapToResponse(ride);
     }
 
-    public RideResponse cancelRide(String rideId) {
+    public RideResponse cancelRide(String rideId, String authUserId) {
         Ride ride = rideRepository.findById(rideId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Ride not found"));
+        requireRiderOwner(ride, authUserId);
         if (ride.getStatus() == RideStatus.COMPLETED) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                     "Ride cannot be cancelled from current status: " + ride.getStatus());
@@ -198,27 +206,70 @@ public class RideService {
         }
     }
 
-    public RideResponse getRideById(String rideId) {
+    public RideResponse getRideById(String rideId, String authUserId, String role) {
         Ride ride = rideRepository.findById(rideId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Ride not found"));
+        if ("RIDER".equals(role)) {
+            requireRiderOwner(ride, authUserId);
+        } else if ("DRIVER".equals(role)) {
+            requireAssignedDriver(ride, authUserId);
+        } else {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Role cannot access rides");
+        }
         return mapToResponse(ride);
     }
 
-    public List<RideResponse> getRidesByRider(String riderId) {
+    public List<RideResponse> getRidesByRider(String riderId, String authUserId) {
+        com.flashCab.riderService.dto.RiderResponse rider = getRiderByAuthUserId(authUserId);
+        if (!Objects.equals(rider.getId(), riderId)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                    "Rider ID does not belong to the authenticated account");
+        }
         return rideRepository.findByRiderIdOrderByCreatedAtDesc(riderId)
                 .stream()
                 .map(this::mapToResponse)
                 .collect(Collectors.toList());
     }
 
-    private void validateRiderExists(String riderId) {
+    private com.flashCab.riderService.dto.RiderResponse getRiderByAuthUserId(String authUserId) {
+        if (authUserId == null || authUserId.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Authenticated user is required");
+        }
         try {
-            riderServiceClient.getRiderById(riderId);
+            return riderServiceClient.getRiderByAuthUserId(authUserId);
         } catch (FeignException.NotFound e) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Rider does not exist: " + riderId);
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "No rider profile belongs to this account");
         } catch (FeignException e) {
-            log.error("Unable to validate rider {} from Rider Service: {}", riderId, e.getMessage());
+            log.error("Unable to resolve rider profile for authenticated user {}: {}", authUserId, e.getMessage());
             throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "Rider Service is unavailable");
+        }
+    }
+
+    private void requireRiderOwner(Ride ride, String authUserId) {
+        com.flashCab.riderService.dto.RiderResponse rider = getRiderByAuthUserId(authUserId);
+        if (!Objects.equals(rider.getId(), ride.getRiderId())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Ride does not belong to this rider");
+        }
+    }
+
+    private void requireAssignedDriver(Ride ride, String authUserId) {
+        if (authUserId == null || authUserId.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Authenticated user is required");
+        }
+        if (ride.getDriverId() == null || ride.getDriverId().isBlank()) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Ride has no assigned driver");
+        }
+        try {
+            com.flashCab.driverService.dto.DriverResponse driver =
+                    driverServiceClient.getDriverById(ride.getDriverId());
+            if (!Objects.equals(driver.getAuthUserId(), authUserId)) {
+                throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Ride is assigned to another driver");
+            }
+        } catch (FeignException.NotFound exception) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Ride is assigned to another driver");
+        } catch (FeignException exception) {
+            log.error("Unable to resolve assigned driver for ride {}: {}", ride.getId(), exception.getMessage());
+            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "Driver Service is unavailable");
         }
     }
 
