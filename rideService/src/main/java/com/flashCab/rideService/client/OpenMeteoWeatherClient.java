@@ -1,6 +1,7 @@
 package com.flashCab.rideService.client;
 
 import com.flashCab.rideService.dto.OpenMeteoWeatherResponse;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
@@ -10,15 +11,14 @@ import java.time.Duration;
 @Component
 public class OpenMeteoWeatherClient {
 
-    private static final String OPEN_METEO_URL = "https://api.open-meteo.com";
     private final RestClient restClient;
 
-    public OpenMeteoWeatherClient() {
+    public OpenMeteoWeatherClient(@Value("${open-meteo.service.url}") String baseUrl) {
         SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
         requestFactory.setConnectTimeout(Duration.ofSeconds(2));
         requestFactory.setReadTimeout(Duration.ofSeconds(3));
         this.restClient = RestClient.builder()
-                .baseUrl(OPEN_METEO_URL)
+                .baseUrl(baseUrl)
                 .requestFactory(requestFactory)
                 .build();
     }

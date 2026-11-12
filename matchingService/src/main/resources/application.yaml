@@ -1,9 +1,11 @@
 spring:
   application:
     name: matchingService
+  config:
+    import: optional:file:./.env[.properties]
 
   kafka:
-    bootstrap-servers: localhost:9092
+    bootstrap-servers: "${MATCHING_KAFKA_BOOTSTRAP_SERVERS:localhost:9092}"
 
     consumer:
       group-id: matching-service-group
@@ -21,11 +23,11 @@ spring:
 
 location:
   service:
-    url: http://localhost:8082
+    url: "${MATCHING_LOCATION_SERVICE_URL:http://localhost:8082}"
 
 driver:
   service:
-    url: http://localhost:8085
+    url: "${MATCHING_DRIVER_SERVICE_URL:http://localhost:8085}"
 
 management:
   endpoints:
@@ -34,4 +36,4 @@ management:
         include: health, info
 
 server:
-  port: 8084
+  port: "${MATCHING_SERVER_PORT:8084}"

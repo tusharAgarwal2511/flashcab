@@ -1,47 +1,49 @@
 spring:
   application:
     name: gatewayService
+  config:
+    import: optional:file:./.env[.properties]
   cloud:
     gateway:
       server:
         webflux:
           routes:
             - id: riders
-              uri: http://localhost:8086
+              uri: "${GATEWAY_RIDER_SERVICE_URL:http://localhost:8086}"
               predicates:
                 - Path=/api/v1/riders/**
             - id: drivers
-              uri: http://localhost:8085
+              uri: "${GATEWAY_DRIVER_SERVICE_URL:http://localhost:8085}"
               predicates:
                 - Path=/api/v1/drivers/**
             - id: locations
-              uri: http://localhost:8082
+              uri: "${GATEWAY_LOCATION_SERVICE_URL:http://localhost:8082}"
               predicates:
                 - Path=/api/v1/locations/**
             - id: rides
-              uri: http://localhost:8083
+              uri: "${GATEWAY_RIDE_SERVICE_URL:http://localhost:8083}"
               predicates:
                 - Path=/api/v1/rides/**
             - id: rider-openapi
-              uri: http://localhost:8086
+              uri: "${GATEWAY_RIDER_SERVICE_URL:http://localhost:8086}"
               predicates:
                 - Path=/rider-service/v3/api-docs/**
               filters:
                 - StripPrefix=1
             - id: driver-openapi
-              uri: http://localhost:8085
+              uri: "${GATEWAY_DRIVER_SERVICE_URL:http://localhost:8085}"
               predicates:
                 - Path=/driver-service/v3/api-docs/**
               filters:
                 - StripPrefix=1
             - id: location-openapi
-              uri: http://localhost:8082
+              uri: "${GATEWAY_LOCATION_SERVICE_URL:http://localhost:8082}"
               predicates:
                 - Path=/location-service/v3/api-docs/**
               filters:
                 - StripPrefix=1
             - id: ride-openapi
-              uri: http://localhost:8083
+              uri: "${GATEWAY_RIDE_SERVICE_URL:http://localhost:8083}"
               predicates:
                 - Path=/ride-service/v3/api-docs/**
               filters:
@@ -62,4 +64,4 @@ springdoc:
         url: /ride-service/v3/api-docs
 
 server:
-  port: 8081
+  port: "${GATEWAY_SERVER_PORT:8081}"
