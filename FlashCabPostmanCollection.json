@@ -331,7 +331,7 @@
           ]
         }
       ],
-      "description": "Location seeding, reservation, release, and removal are internal/admin operations and are intentionally not exposed through the Gateway."
+      "description": "Driver locations are created through the authenticated update endpoint. Reservation, release, and location removal are internal/admin operations and are not exposed through the Gateway."
     },
     {
       "name": "Ride Service",
@@ -488,27 +488,7 @@
       "name": "Rider Profile",
       "item": [
         {
-          "name": "1 - Get My Rider Profiles",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": "{{gatewayBaseUrl}}/api/v1/riders",
-            "description": "Rider token required; returns only the authenticated user profile."
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test('Status is 200 OK', function () { pm.response.to.have.status(200); });"
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "name": "2 - Get My Rider Profile",
+          "name": "1 - Get My Rider Profile",
           "request": {
             "method": "GET",
             "header": [],
@@ -528,7 +508,7 @@
           ]
         },
         {
-          "name": "3 - Update My Rider Profile",
+          "name": "2 - Update My Rider Profile",
           "request": {
             "method": "PUT",
             "header": [
@@ -562,7 +542,7 @@
           ]
         },
         {
-          "name": "4 - Delete My Rider Profile",
+          "name": "3 - Delete My Rider Profile",
           "request": {
             "method": "DELETE",
             "header": [],
@@ -588,27 +568,7 @@
       "name": "Driver Profile",
       "item": [
         {
-          "name": "1 - Get My Driver Profiles",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": "{{gatewayBaseUrl}}/api/v1/drivers",
-            "description": "Driver token required; returns only the authenticated user profile."
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test('Status is 200 OK', function () { pm.response.to.have.status(200); });"
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "name": "2 - Get My Driver Profile",
+          "name": "1 - Get My Driver Profile",
           "request": {
             "method": "GET",
             "header": [],
@@ -628,7 +588,7 @@
           ]
         },
         {
-          "name": "3 - Update My Driver Profile",
+          "name": "2 - Update My Driver Profile",
           "request": {
             "method": "PUT",
             "header": [
@@ -662,7 +622,7 @@
           ]
         },
         {
-          "name": "4 - Delete My Driver Profile",
+          "name": "3 - Delete My Driver Profile",
           "request": {
             "method": "DELETE",
             "header": [],

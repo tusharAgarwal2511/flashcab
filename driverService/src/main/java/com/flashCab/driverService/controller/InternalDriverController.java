@@ -24,11 +24,6 @@ public class InternalDriverController {
         return ResponseEntity.status(HttpStatus.CREATED).body(driverService.provisionDriver(request));
     }
 
-    @GetMapping
-    public ResponseEntity<List<DriverResponse>> getAllDrivers() {
-        return ResponseEntity.ok(driverService.getInternalDrivers());
-    }
-
     @GetMapping("/batch")
     public ResponseEntity<List<DriverResponse>> getDriversByIds(@RequestParam("ids") List<String> ids) {
         return ResponseEntity.ok(driverService.getDriversByIds(ids));

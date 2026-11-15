@@ -7,6 +7,4 @@ import java.util.Optional;
 
 public interface DriverRepository extends MongoRepository<Driver, String> {
     Optional<Driver> findByAuthUserId(String authUserId);
-
-    boolean existsByAuthUserId(String authUserId);
 }

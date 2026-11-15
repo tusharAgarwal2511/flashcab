@@ -28,22 +28,6 @@ public class DriverService {
     private final DriverRepository driverRepository;
     private final LocationServiceClient locationServiceClient;
 
-    public DriverResponse registerDriver(DriverRequest request, String authUserId) {
-        requireAuthUserId(authUserId);
-        if (driverRepository.existsByAuthUserId(authUserId)) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "Driver profile already exists");
-        }
-        Driver driver = new Driver();
-        applyRequest(driver, request);
-        driver.setAuthUserId(authUserId);
-        driver.setCreatedAt(LocalDateTime.now());
-        try {
-            return mapToResponse(driverRepository.save(driver));
-        } catch (DuplicateKeyException exception) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "Driver profile already exists");
-        }
-    }
-
     public DriverResponse provisionDriver(DriverProfileProvisionRequest request) {
         requireAuthUserId(request.getAuthUserId());
         return driverRepository.findByAuthUserId(request.getAuthUserId())
@@ -65,16 +49,6 @@ public class DriverService {
                                 .orElseThrow(() -> exception);
                     }
                 });
-    }
-
-    public List<DriverResponse> getDriversForUser(String authUserId) {
-        return List.of(getDriverByAuthUserId(authUserId));
-    }
-
-    public List<DriverResponse> getInternalDrivers() {
-        return driverRepository.findAll().stream()
-                .map(this::mapToResponse)
-                .collect(Collectors.toList());
     }
 
     public List<DriverResponse> getDriversByIds(List<String> driverIds) {

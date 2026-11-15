@@ -12,7 +12,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDateTime;
-import java.util.List;
 import java.util.Objects;
 
 @Service
@@ -20,24 +19,6 @@ import java.util.Objects;
 public class RiderService {
 
     private final RiderRepository riderRepository;
-
-    public RiderResponse registerRider(RiderRequest request, String authUserId) {
-        requireAuthUserId(authUserId);
-        if (riderRepository.existsByAuthUserId(authUserId)) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "Rider profile already exists");
-        }
-        LocalDateTime now = LocalDateTime.now();
-        Rider rider = new Rider();
-        applyRequest(rider, request);
-        rider.setAuthUserId(authUserId);
-        rider.setCreatedAt(now);
-        rider.setUpdatedAt(now);
-        try {
-            return mapToResponse(riderRepository.save(rider));
-        } catch (DuplicateKeyException exception) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "Rider profile already exists");
-        }
-    }
 
     public RiderResponse provisionRider(RiderProfileProvisionRequest request) {
         requireAuthUserId(request.getAuthUserId());
@@ -60,10 +41,6 @@ public class RiderService {
                                 .orElseThrow(() -> exception);
                     }
                 });
-    }
-
-    public List<RiderResponse> getRidersForUser(String authUserId) {
-        return List.of(getRiderByAuthUserId(authUserId));
     }
 
     public RiderResponse getRiderById(String riderId, String authUserId) {

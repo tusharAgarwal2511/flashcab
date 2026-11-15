@@ -13,6 +13,7 @@ import com.flashCab.rideService.model.RideStatus;
 import com.flashCab.rideService.model.VehicleType;
 import com.flashCab.rideService.repository.RideRepository;
 import feign.FeignException;
+import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -85,24 +86,75 @@ public class RideService {
         return mapToResponse(savedRide);
     }
 
+//    public void updateRideWithDriver(String rideId, String driverId) {
+//        if (driverId == null || driverId.isBlank()) {
+//            log.warn("Ignoring match with missing driver ID for ride {}", rideId);
+//            return;
+//        }
+//        Ride ride = rideRepository.findById(rideId)
+//                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Ride not found"));
+//
+//        if (ride.getStatus() == RideStatus.CANCELLED || ride.getStatus() == RideStatus.COMPLETED) {
+//            log.warn("Ignoring matching result for ride {} in status {}", rideId, ride.getStatus());
+//            releaseDriverReservation(driverId, rideId);
+//            return;
+//        }
+//
+//        if (ride.getStatus() != RideStatus.REQUESTED && ride.getStatus() != RideStatus.MATCHING) {
+//            if (!driverId.equals(ride.getDriverId())) {
+//                releaseDriverReservation(driverId, rideId);
+//            }
+//            return;
+//        }
+//
+//        com.flashCab.driverService.dto.DriverResponse driver;
+//        try {
+//            driver = driverServiceClient.getDriverById(driverId);
+//        } catch (FeignException.NotFound e) {
+//            releaseDriverReservation(driverId, rideId);
+//            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Matched driver not found");
+//        } catch (FeignException e) {
+//            log.error("Driver Service unavailable while processing matched ride {}: {}", rideId, e.getMessage());
+//            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "Driver Service is unavailable");
+//        }
+//
+//        if (driver == null || driver.getVehicleType() == null) {
+//            releaseDriverReservation(driverId, rideId);
+//            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+//                    "Matched driver is invalid or missing vehicle type");
+//        }
+//
+//        if (ride.getVehicleType() != null && !driver.getVehicleType().name().equals(ride.getVehicleType().name())) {
+//            releaseDriverReservation(driverId, rideId);
+//            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+//                    "Matched driver vehicle type does not match the requested vehicle type");
+//        }
+//
+//        ride.setDriverId(driverId);
+//        ride.setStatus(RideStatus.ACCEPTED);
+//        ride.setActualFare(ride.getEstimatedFare());
+//        rideRepository.save(ride);
+//    }
+
+    @Transactional
     public void updateRideWithDriver(String rideId, String driverId) {
-        if (driverId == null || driverId.isBlank()) {
-            log.warn("Ignoring match with missing driver ID for ride {}", rideId);
+        if (rideId == null || rideId.isBlank()
+                || driverId == null || driverId.isBlank()) {
+            log.warn("Ignoring match with invalid ride or driver ID");
             return;
         }
+
         Ride ride = rideRepository.findById(rideId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Ride not found"));
+                .orElseThrow(() ->
+                        new ResponseStatusException(HttpStatus.NOT_FOUND, "Ride not found"));
 
-        if (ride.getStatus() == RideStatus.CANCELLED || ride.getStatus() == RideStatus.COMPLETED) {
-            log.warn("Ignoring matching result for ride {} in status {}", rideId, ride.getStatus());
+        if ((ride.getStatus() != RideStatus.REQUESTED
+                && ride.getStatus() != RideStatus.MATCHING)
+                || ride.getDriverId() != null) {
+            log.warn("Ignoring matching result for ride {} in status {}",
+                    rideId, ride.getStatus());
+
             releaseDriverReservation(driverId, rideId);
-            return;
-        }
-
-        if (ride.getStatus() != RideStatus.REQUESTED && ride.getStatus() != RideStatus.MATCHING) {
-            if (!driverId.equals(ride.getDriverId())) {
-                releaseDriverReservation(driverId, rideId);
-            }
             return;
         }
 
@@ -111,10 +163,13 @@ public class RideService {
             driver = driverServiceClient.getDriverById(driverId);
         } catch (FeignException.NotFound e) {
             releaseDriverReservation(driverId, rideId);
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Matched driver not found");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Matched driver not found");
         } catch (FeignException e) {
-            log.error("Driver Service unavailable while processing matched ride {}: {}", rideId, e.getMessage());
-            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "Driver Service is unavailable");
+            log.error("Driver Service unavailable while processing matched ride {}: {}",
+                    rideId, e.getMessage());
+            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE,
+                    "Driver Service is unavailable");
         }
 
         if (driver == null || driver.getVehicleType() == null) {
@@ -123,17 +178,31 @@ public class RideService {
                     "Matched driver is invalid or missing vehicle type");
         }
 
-        if (ride.getVehicleType() != null && !driver.getVehicleType().name().equals(ride.getVehicleType().name())) {
+        if (ride.getVehicleType() != null
+                && !driver.getVehicleType().name()
+                .equals(ride.getVehicleType().name())) {
             releaseDriverReservation(driverId, rideId);
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                    "Matched driver vehicle type does not match the requested vehicle type");
+                    "Matched driver vehicle type does not match requested vehicle type");
         }
 
-        ride.setDriverId(driverId);
-        ride.setStatus(RideStatus.ACCEPTED);
-        ride.setActualFare(ride.getEstimatedFare());
-        rideRepository.save(ride);
+        int updated = rideRepository.assignDriverIfMatching(
+                rideId,
+                driverId,
+                RideStatus.REQUESTED,
+                RideStatus.MATCHING,
+                RideStatus.ACCEPTED
+        );
+
+        if (updated == 0) {
+            log.warn("Ride {} was no longer eligible for driver assignment", rideId);
+            releaseDriverReservation(driverId, rideId);
+            return;
+        }
+
+        log.info("Driver {} successfully assigned to ride {}", driverId, rideId);
     }
+
 
     public RideResponse startRide(String rideId, String authUserId) {
         Ride ride = rideRepository.findById(rideId)
@@ -300,7 +369,7 @@ public class RideService {
     }
 
     private double calculateDistanceKm(double pickupLatitude, double pickupLongitude, double dropLatitude,
-            double dropLongitude) {
+                                       double dropLongitude) {
         double lat1 = Math.toRadians(pickupLatitude);
         double lat2 = Math.toRadians(dropLatitude);
         double lon1 = Math.toRadians(pickupLongitude);

@@ -82,8 +82,6 @@ public class GatewaySecurityConfiguration {
                 .authorizeExchange(exchange -> exchange
                         .pathMatchers(HttpMethod.POST, "/auth/signup", "/auth/login").permitAll()
                         .pathMatchers("/auth/**", "/internal/**").denyAll()
-                        .pathMatchers("/api/v1/drivers/batch").denyAll()
-                        .pathMatchers(HttpMethod.GET, "/api/v1/locations/drivers/seed").denyAll()
                         .pathMatchers(HttpMethod.POST,
                                 "/api/v1/locations/drivers/*/reserve",
                                 "/api/v1/locations/drivers/*/release").denyAll()

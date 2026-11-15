@@ -18,7 +18,6 @@ import org.springframework.web.server.ResponseStatusException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
-import java.util.concurrent.ThreadLocalRandom;
 
 @Service
 @Slf4j
@@ -80,43 +79,6 @@ public class LocationService {
         redisTemplate.opsForGeo().add(DRIVERS_GEO_KEY, driverPoint, driverId);
         initializeAvailability(driverId);
         log.info("Location updated for driver: {}", driverId);
-    }
-
-    public int seedDrivers(int count, double minLat, double maxLat, double minLon, double maxLon) {
-        if (count <= 0) {
-            return 0;
-        }
-
-        List<DriverResponse> drivers;
-        try {
-            drivers = driverServiceClient.getDrivers();
-        } catch (FeignException.NotFound e) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "No registered drivers available to seed");
-        } catch (FeignException e) {
-            log.error("Unable to fetch registered drivers for seeding: {}", e.getMessage());
-            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "Driver Service is unavailable");
-        }
-
-        if (drivers == null || drivers.isEmpty()) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "No registered drivers available to seed");
-        }
-
-        List<String> driverIds = drivers.stream().map(DriverResponse::getId).filter(id -> id != null && !id.isBlank()).distinct().toList();
-        int availableCount = Math.min(count, driverIds.size());
-        if (availableCount <= 0) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "No registered drivers available to seed");
-        }
-
-        ThreadLocalRandom random = ThreadLocalRandom.current();
-        for (int i = 0; i < availableCount; i++) {
-            String driverId = driverIds.get(i);
-            double latitude = random.nextDouble(minLat, maxLat);
-            double longitude = random.nextDouble(minLon, maxLon);
-            Point point = new Point(longitude, latitude);
-            redisTemplate.opsForGeo().add(DRIVERS_GEO_KEY, point, driverId);
-            initializeAvailability(driverId);
-        }
-        return availableCount;
     }
 
     public List<NearByDriverResponse> findNearByDrivers(double latitude, double longitude, double radiusInKm) {

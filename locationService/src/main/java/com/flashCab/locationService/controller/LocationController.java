@@ -43,24 +43,6 @@ public class LocationController {
         return ResponseEntity.ok("Driver location updated");
     }
 
-    @GetMapping("/drivers/seed")
-    @Operation(summary = "Seed driver locations", description = "Adds driver locations within the specified coordinate bounds.")
-    @ApiResponses(@ApiResponse(responseCode = "200", description = "Number of locations added",
-            content = @Content(mediaType = "text/plain", schema = @Schema(implementation = String.class))))
-    public ResponseEntity<String> seedDrivers(
-            @Parameter(description = "Number of driver locations to add", required = true) @RequestParam int count,
-            @Parameter(description = "Minimum latitude of the seed area", required = true)
-            @RequestParam double minLatitude,
-            @Parameter(description = "Maximum latitude of the seed area", required = true)
-            @RequestParam double maxLatitude,
-            @Parameter(description = "Minimum longitude of the seed area", required = true)
-            @RequestParam double minLongitude,
-            @Parameter(description = "Maximum longitude of the seed area", required = true)
-            @RequestParam double maxLongitude) {
-        int added = locationService.seedDrivers(count, minLatitude, maxLatitude, minLongitude, maxLongitude);
-        return ResponseEntity.ok(added + " drivers added to Redis");
-    }
-
     @GetMapping("/drivers/nearby")
     @Operation(summary = "Find nearby drivers", description = "Returns drivers within the requested radius of the supplied coordinates.")
     @ApiResponses(@ApiResponse(responseCode = "200", description = "Nearby drivers",
@@ -70,6 +52,18 @@ public class LocationController {
             @Parameter(description = "Search center longitude", required = true) @RequestParam double longitude,
             @Parameter(description = "Search radius in kilometers; defaults to 5.0")
             @RequestParam(defaultValue = "5.0") double radiusInKm) {
+
+        if (latitude < -90 || latitude > 90) {
+            return ResponseEntity.badRequest().build();
+        }
+
+        if (longitude < -180 || longitude > 180) {
+            return ResponseEntity.badRequest().build();
+        }
+
+        if (radiusInKm <= 0) {
+            return ResponseEntity.badRequest().build();
+        }
         return ResponseEntity.ok(locationService.findNearByDrivers(latitude, longitude, radiusInKm));
     }
 

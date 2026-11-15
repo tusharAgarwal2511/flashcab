@@ -5,7 +5,6 @@ import com.flashCab.driverService.dto.DriverResponse;
 import com.flashCab.driverService.service.DriverService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
-import io.swagger.v3.oas.annotations.media.ArraySchema;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -13,54 +12,17 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.List;
 
 @RestController
 @RequestMapping("/api/v1/drivers")
 @RequiredArgsConstructor
-@Tag(name = "Drivers", description = "Driver registration and profile management")
+@Tag(name = "Drivers", description = "Driver profile management")
 public class DriverController {
 
     private static final String AUTH_USER_ID_HEADER = "X-Authenticated-User-Id";
     private final DriverService driverService;
-
-    @PostMapping
-    @Operation(
-            summary = "Register a driver",
-            description = "Creates a driver profile with contact and vehicle details.",
-            requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(
-                    description = "Driver profile and vehicle details", required = true,
-                    content = @Content(schema = @Schema(implementation = DriverRequest.class))))
-    @ApiResponses(@ApiResponse(responseCode = "201", description = "Driver registered",
-            content = @Content(schema = @Schema(implementation = DriverResponse.class))))
-    public ResponseEntity<DriverResponse> registerDriver(
-            @RequestHeader(AUTH_USER_ID_HEADER) String authUserId,
-            @Valid @RequestBody DriverRequest request) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(driverService.registerDriver(request, authUserId));
-    }
-
-    @GetMapping
-    @Operation(summary = "List drivers", description = "Returns all registered drivers.")
-    @ApiResponses(@ApiResponse(responseCode = "200", description = "Driver list",
-            content = @Content(array = @ArraySchema(schema = @Schema(implementation = DriverResponse.class)))))
-    public ResponseEntity<List<DriverResponse>> getAllDrivers(
-            @RequestHeader(AUTH_USER_ID_HEADER) String authUserId) {
-        return ResponseEntity.ok(driverService.getDriversForUser(authUserId));
-    }
-
-    @GetMapping("/batch")
-    @Operation(summary = "Get drivers by identifiers", description = "Returns drivers matching the supplied identifier list.")
-    @ApiResponses(@ApiResponse(responseCode = "200", description = "Matching drivers",
-            content = @Content(array = @ArraySchema(schema = @Schema(implementation = DriverResponse.class)))))
-    public ResponseEntity<List<DriverResponse>> getDriversByIds(
-            @Parameter(description = "Driver identifiers to retrieve", required = true)
-            @RequestParam("ids") List<String> ids) {
-        return ResponseEntity.ok(driverService.getDriversByIds(ids));
-    }
 
     @GetMapping("/{driverId}")
     @Operation(summary = "Get a driver", description = "Returns a driver by identifier.")
