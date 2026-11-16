@@ -53,99 +53,93 @@ flowchart LR
     Rides -->|weather-aware fare estimate| Weather
 ```
 
-### Ride request and matching
+## Low-Level Design (LLD)
 
-Ride creation is handled synchronously by Ride Service; matching and assignment proceed through Kafka events. Location Service stores coordinates in Redis GEO and tracks availability and ride reservations separately.
-
-```mermaid
-sequenceDiagram
-    autonumber
-    actor Rider
-    participant Gateway
-    participant Ride as Ride Service
-    participant SQL as MySQL
-    participant Kafka
-    participant Match as Matching Service
-    participant Location as Location Service
-    participant Redis
-    participant Driver as Driver Service
-
-    Rider->>Gateway: POST /api/v1/rides/request (Bearer JWT)
-    Gateway->>Gateway: Validate JWT and enforce RIDER role
-    Gateway->>Ride: Forward request with trusted identity
-    Ride->>SQL: Persist ride request
-    Ride->>Kafka: Publish ride.requested
-    Ride-->>Rider: Return ride
-    Kafka-->>Match: Consume ride.requested
-    Match->>Location: Search nearby available drivers
-    Location->>Redis: GEO radius + availability lookup
-    Redis-->>Location: Nearby driver candidates
-    Location-->>Match: Candidate IDs, coordinates, distances
-    Match->>Driver: Fetch candidate profiles
-    Driver-->>Match: Vehicle profiles
-    Match->>Location: Reserve compatible candidate
-    Location->>Redis: Atomically reserve driver for ride
-    Redis-->>Location: Reservation result
-    Location-->>Match: Reserved / unavailable
-    Match->>Kafka: Publish ride.matched
-    Kafka-->>Ride: Consume ride.matched
-    Ride->>SQL: Associate driver and update ride status
-```
-
-### Domain and service responsibilities
+The schema diagram shows the main persisted entities and their logical ID relationships. Auth, Rider, Driver, and Ride are separate service-owned databases; relationships across them are application-level references, not cross-database foreign keys.
 
 ```mermaid
-classDiagram
-    class GatewaySecurityConfiguration
-    class AuthenticatedIdentityHeaderFilter
-    class AuthService
-    class RiderService
-    class RideController
-    class RideService
-    class Ride {
-        +id
-        +riderId
-        +driverId
-        +status
-        +vehicleType
-        +pickupLatitude
-        +pickupLongitude
-        +dropLatitude
-        +dropLongitude
-        +estimatedFare
-        +actualFare
-    }
-    class RideRepository {
-        +findByRiderIdOrderByCreatedAtDesc(riderId)
-        +assignDriverIfMatching(rideId, driverId, statuses)
-    }
-    class RideEventConsumer
-    class MatchingService {
-        +matchDriverForRide(event)
-        -rankDrivers(drivers, profiles)
-    }
-    class DriverService {
-        +getDriversByIds(driverIds)
-    }
-    class LocationService {
-        +updateDriverLocation(location, authUserId)
-        +findNearByDrivers(latitude, longitude, radius)
-        +reserveDriver(driverId, rideId)
-        +releaseDriver(driverId, rideId)
+erDiagram
+    AUTH_USER {
+        string id PK
+        string email UK
+        string passwordHash
+        string role "RIDER or DRIVER"
+        string status
+        string name
+        string phone
+        string vehicleType "Driver accounts"
+        string vehicleNumber "Driver accounts"
+        string profileId "Rider or Driver document ID"
+        datetime createdAt
     }
 
-    GatewaySecurityConfiguration --> AuthenticatedIdentityHeaderFilter : JWT identity context
-    AuthenticatedIdentityHeaderFilter --> RideController : trusted identity headers
-    AuthService ..> RiderService : profile provisioning
-    AuthService ..> DriverService : profile provisioning
-    RideController --> RideService
-    RideService --> RideRepository
-    RideRepository --> Ride : persists
-    RideEventConsumer --> RideService : applies ride.matched
-    RideService ..> MatchingService : ride.requested event via Kafka
-    MatchingService --> LocationService : discover and reserve
-    MatchingService --> DriverService : profile and vehicle compatibility
+    RIDER {
+        string id PK
+        string authUserId UK "Sparse unique index"
+        string name
+        string email
+        string phone
+        datetime createdAt
+        datetime updatedAt
+    }
+
+    DRIVER {
+        string id PK
+        string authUserId UK "Sparse unique index"
+        string name
+        string email
+        string phone
+        string vehicleType
+        string vehicleNumber
+        datetime createdAt
+    }
+
+    RIDE {
+        string id PK "UUID"
+        string riderId "Required; logical reference"
+        string driverId "Nullable until matched"
+        string vehicleType
+        string status
+        double pickupLatitude
+        double pickupLongitude
+        string pickupAddress
+        double dropLatitude
+        double dropLongitude
+        string dropAddress
+        double estimatedFare
+        double actualFare
+        datetime createdAt
+        datetime updatedAt
+        datetime startedAt
+        datetime completedAt
+    }
+
+    AUTH_USER ||--o| RIDER : "profileId / authUserId"
+    AUTH_USER ||--o| DRIVER : "profileId / authUserId"
+    RIDER ||--o{ RIDE : "riderId"
+    DRIVER o|--o{ RIDE : "driverId"
 ```
+
+### Database mapping
+
+| Service | Database / collection or table | Schema notes |
+|---|---|---|
+| Auth | MongoDB `flashcab_auth.users` | Unique index on `email`; stores password hash, role, account status, and associated `profileId`. |
+| Rider | MongoDB `flashcab_riders.riders` | Sparse unique index on `authUserId`; rider profile document. |
+| Driver | MongoDB `flashcab_drivers.drivers` | Sparse unique index on `authUserId`; includes vehicle type and number. |
+| Ride | MySQL `flashcab_rides.rides` | JPA entity; `id` is a UUID, `status` and `vehicleType` are stored as enum strings. |
+
+`AUTH_USER.profileId` and profile `authUserId` values are maintained by profile provisioning. `RIDE.riderId` and `RIDE.driverId` refer to profile IDs; they are not database-enforced foreign keys because those profiles belong to separate services.
+
+### Redis location and reservation keys
+
+| Key | Redis type | Value |
+|---|---|---|
+| `drivers.locations` | GEO set | `driverId` member at longitude/latitude |
+| `drivers.availability` | Hash | `driverId` → `true` or `false` |
+| `drivers.reservations` | Hash | `driverId` → reserving `rideId` |
+
+Location Service updates coordinates and initializes driver availability. Its Lua scripts reserve an available driver atomically and release a reservation only when the stored `rideId` matches the requesting ride.
 
 ## Services
 
