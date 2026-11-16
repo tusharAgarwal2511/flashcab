@@ -643,11 +643,6 @@
         }
       ],
       "description": "Driver profiles are created by Authentication / Sign Up Driver; profile registration is not a separate signup flow."
-    },
-    {
-      "name": "Matching Service",
-      "item": [],
-      "description": "No public REST endpoints. It consumes ride.requested Kafka events and publishes ride.matched events; ride matching is asynchronous."
     }
   ]
 }
